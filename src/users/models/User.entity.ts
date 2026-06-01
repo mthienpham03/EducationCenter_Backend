@@ -5,7 +5,10 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     DeleteDateColumn,
+    OneToOne,
 } from 'typeorm';
+import { LecturerProfile } from '../../lecturers/models/LecturerProfile.entity';
+import { StudentProfile } from '../../students/models/StudentProfile.entity';
 
 export enum UserRole {
     ADMIN = 'admin',
@@ -25,13 +28,13 @@ export class User {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ unique: true, length: 255 })
+    @Column({ type: 'varchar', unique: true, length: 255 })
     email: string;
 
-    @Column({ name: 'password_hash', length: 255 })
+    @Column({ type: 'varchar', name: 'password_hash', length: 255 })
     passwordHash: string;
 
-    @Column({ name: 'full_name', length: 255 })
+    @Column({ type: 'varchar', name: 'full_name', length: 255 })
     fullName: string;
 
     @Column({ type: 'varchar', length: 20, nullable: true })
@@ -65,4 +68,10 @@ export class User {
 
     @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
     deletedAt: Date | null;
+
+    @OneToOne(() => LecturerProfile, profile => profile.user)
+    lecturerProfile: LecturerProfile;
+
+    @OneToOne(() => StudentProfile, profile => profile.user)
+    studentProfile: StudentProfile;
 }
