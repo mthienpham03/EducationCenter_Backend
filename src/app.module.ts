@@ -10,6 +10,7 @@ import redisConfig from './configs/redis.config';
 import mailConfig from './configs/mail.config';
 import { RedisModule } from './utils/redis/redis.module';
 import { MailModule } from './utils/mail/modules/mail.module';
+import { UsersModule } from './users/modules/users.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -21,6 +22,7 @@ import { MailModule } from './utils/mail/modules/mail.module';
     RedisModule,
     MailModule,
     AuthModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
