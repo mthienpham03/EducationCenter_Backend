@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Khởi tạo tài khoản EduCenter LMS</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+    }
+    .container {
+      max-width: 600px;
+      margin: 30px auto;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    .header {
+      background-color: #2563eb;
+      color: #ffffff;
+      padding: 20px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .content {
+      padding: 30px;
+    }
+    .content h2 {
+      color: #1e40af;
+      font-size: 20px;
+    }
+    .info-box {
+      background-color: #f3f4f6;
+      border-left: 4px solid #3b82f6;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .info-box p {
+      margin: 5px 0;
+      font-size: 16px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      background-color: #2563eb;
+      color: #ffffff !important;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+    .footer {
+      background-color: #f1f5f9;
+      padding: 15px;
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>EduCenter LMS</h1>
+    </div>
+    
+    <div class="content">
+      <h2>Xin chào {{fullName}},</h2>
+      <p>Tài khoản <strong>{{roleName}}</strong> của bạn trên hệ thống EduCenter LMS đã được quản trị viên khởi tạo thành công.</p>
+      
+      <p>Dưới đây là thông tin đăng nhập của bạn. Khuyến nghị bạn nên đổi mật khẩu ngay sau lần đăng nhập đầu tiên để đảm bảo an toàn.</p>
+      
+      <div class="info-box">
+        <p><strong>Email đăng nhập:</strong> {{email}}</p>
+        <p><strong>Mật khẩu tạm thời:</strong> {{password}}</p>
+      </div>
+      
+      <p>Bạn có thể nhấp vào nút bên dưới để truy cập vào hệ thống:</p>
+      <a href="{{loginUrl}}" class="btn">Đăng Nhập Ngay</a>
+      
+      <p style="margin-top: 30px;">Trân trọng,<br>Ban quản trị EduCenter</p>
+    </div>
+    
+    <div class="footer">
+      <p>Email này được gửi tự động từ hệ thống. Vui lòng không trả lời email này.</p>
+      <p>&copy; 2026 EduCenter. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
