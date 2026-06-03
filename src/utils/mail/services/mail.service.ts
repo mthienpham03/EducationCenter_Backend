@@ -42,4 +42,26 @@ export class MailService {
       return false;
     }
   }
+
+  /**
+   * Gửi mã OTP khôi phục mật khẩu
+   */
+  async sendResetPasswordOtp(email: string, otp: string): Promise<boolean> {
+    try {
+      await this.mailerService.sendMail({
+        to: email,
+        subject: 'Mã xác nhận khôi phục mật khẩu',
+        template: './reset-password',
+        context: {
+          email,
+          otp,
+        },
+      });
+      this.logger.log(`OTP khôi phục mật khẩu đã gửi đến ${email}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Lỗi khi gửi OTP đến ${email}:`, error);
+      return false;
+    }
+  }
 }

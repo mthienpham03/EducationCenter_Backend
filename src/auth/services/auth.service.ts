@@ -5,7 +5,11 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User, UserStatus } from '../../users/models/User.entity';
 import { LoginDto } from '../dto/login.dto';
+import { ChangePasswordDto } from '../dto/change-password.dto';
+import { ForgotPasswordDto } from '../dto/forgot-password.dto';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { ConfigService } from '@nestjs/config';
+import { MailService } from '../../utils/mail/services/mail.service';
 import Redis from 'ioredis';
 
 @Injectable()
@@ -15,6 +19,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     @Inject('REDIS_CLIENT') private redisClient: Redis,
+    private mailService: MailService,
   ) {}
 
   async login(loginDto: LoginDto) {
@@ -82,5 +87,100 @@ export class AuthService {
     // Delete session from Redis
     await this.redisClient.del(`session:${userId}`);
     return { success: true, message: 'Đăng xuất thành công' };
+  }
+
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
+    const { oldPassword, newPassword, confirmPassword } = changePasswordDto;
+
+    if (newPassword !== confirmPassword) {
+      throw new UnauthorizedException('Mật khẩu xác nhận không khớp');
+    }
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('Người dùng không tồn tại');
+    }
+
+    const isPasswordValid = await bcrypt.compare(oldPassword, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Mật khẩu hiện tại không chính xác');
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    user.passwordHash = newPasswordHash;
+    await this.userRepository.save(user);
+
+    // Xóa session hiện tại để bắt buộc đăng nhập lại
+    await this.logout(userId);
+
+    return {
+      success: true,
+      message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.',
+    };
+  }
+
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+    const { email } = forgotPasswordDto;
+
+    const user = await this.userRepository.findOne({ where: { email } });
+    if (!user) {
+      // Vì lý do bảo mật, không trả về lỗi "Email không tồn tại" trực tiếp
+      // nhưng ở đây trong context thực hành, ta có thể trả về lỗi.
+      throw new UnauthorizedException('Email không tồn tại trong hệ thống');
+    }
+
+    const redisKey = `otp:${email}`;
+    const existingOtp = await this.redisClient.get(redisKey);
+    if (existingOtp) {
+      throw new UnauthorizedException('Vui lòng đợi hết 60 giây trước khi yêu cầu mã mới');
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
+
+    // Lưu Redis 60s
+    await this.redisClient.set(redisKey, otp, 'EX', 60);
+
+    // Gửi mail
+    this.mailService.sendResetPasswordOtp(email, otp).catch(e => console.error(e));
+
+    return {
+      success: true,
+      message: 'Mã xác nhận đã được gửi đến email của bạn',
+    };
+  }
+
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    const { email, otp, newPassword, confirmPassword } = resetPasswordDto;
+
+    if (newPassword !== confirmPassword) {
+      throw new UnauthorizedException('Mật khẩu xác nhận không khớp');
+    }
+
+    const redisKey = `otp:${email}`;
+    const storedOtp = await this.redisClient.get(redisKey);
+
+    if (!storedOtp || storedOtp !== otp) {
+      throw new UnauthorizedException('Mã xác nhận không chính xác hoặc đã hết hạn');
+    }
+
+    const user = await this.userRepository.findOne({ where: { email } });
+    if (!user) {
+      throw new UnauthorizedException('Email không tồn tại trong hệ thống');
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    user.passwordHash = newPasswordHash;
+    await this.userRepository.save(user);
+
+    // Xóa OTP khỏi Redis
+    await this.redisClient.del(redisKey);
+
+    // Xóa luôn session hiện tại để bắt đăng nhập lại nếu đang login ở đâu đó
+    await this.logout(user.id);
+
+    return {
+      success: true,
+      message: 'Đặt lại mật khẩu thành công',
+    };
   }
 }

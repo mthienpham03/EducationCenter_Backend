@@ -1,7 +1,10 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Get, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Get, UseGuards, Req, Put } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
 import { LoginDto } from '../dto/login.dto';
+import { ChangePasswordDto } from '../dto/change-password.dto';
+import { ForgotPasswordDto } from '../dto/forgot-password.dto';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 @ApiTags('Auth')
@@ -39,5 +42,33 @@ export class AuthController {
       success: true,
       data: userWithoutPassword,
     };
+  }
+
+  @Put('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Đổi mật khẩu' })
+  @ApiResponse({ status: 200, description: 'Đổi mật khẩu thành công' })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ hoặc mật khẩu xác nhận không khớp' })
+  @ApiResponse({ status: 401, description: 'Mật khẩu cũ không chính xác' })
+  async changePassword(@Req() req, @Body() changePasswordDto: ChangePasswordDto) {
+    return this.authService.changePassword(req.user.id, changePasswordDto);
+  }
+
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Yêu cầu gửi mã OTP khôi phục mật khẩu' })
+  @ApiResponse({ status: 201, description: 'Đã gửi mã OTP đến email' })
+  @ApiResponse({ status: 401, description: 'Email không tồn tại hoặc yêu cầu quá nhanh' })
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(forgotPasswordDto);
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Đặt lại mật khẩu bằng mã OTP' })
+  @ApiResponse({ status: 201, description: 'Đặt lại mật khẩu thành công' })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ hoặc mật khẩu xác nhận không khớp' })
+  @ApiResponse({ status: 401, description: 'Mã xác nhận sai hoặc hết hạn' })
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.authService.resetPassword(resetPasswordDto);
   }
 }
