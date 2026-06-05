@@ -1,11 +1,11 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Get, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { UsersService } from '../services/users.service';
 import { CreateLecturerDto, CreateStudentDto } from '../dto/create-user.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { UserRole } from '../models/User.entity';
+import { UserRole, UserStatus } from '../models/User.entity';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -14,6 +14,19 @@ import { UserRole } from '../models/User.entity';
 @Roles(UserRole.ADMIN) // Chỉ Admin mới được truy cập các API trong controller này
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Admin lấy danh sách tất cả người dùng' })
+  @ApiQuery({ name: 'search', required: false, description: 'Tìm kiếm theo tên, email hoặc SĐT' })
+  @ApiQuery({ name: 'role', required: false, enum: UserRole, description: 'Lọc theo vai trò' })
+  @ApiQuery({ name: 'status', required: false, enum: UserStatus, description: 'Lọc theo trạng thái' })
+  async findAll(
+    @Query('search') search?: string,
+    @Query('role') role?: UserRole,
+    @Query('status') status?: UserStatus,
+  ) {
+    return this.usersService.findAll(search, role, status);
+  }
 
   @Post('lecturers')
   @ApiOperation({ summary: 'Admin tạo tài khoản Giảng viên mới' })
@@ -31,5 +44,20 @@ export class UsersController {
   @ApiResponse({ status: 403, description: 'Không có quyền truy cập' })
   async createStudent(@Body() createStudentDto: CreateStudentDto) {
     return this.usersService.createStudent(createStudentDto);
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Admin cập nhật trạng thái hoạt động của tài khoản' })
+  async updateStatus(
+    @Param('id') id: string,
+    @Body('status') status: UserStatus,
+  ) {
+    return this.usersService.updateStatus(id, status);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Admin xóa tài khoản người dùng' })
+  async remove(@Param('id') id: string) {
+    return this.usersService.remove(id);
   }
 }
