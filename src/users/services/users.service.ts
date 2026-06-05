@@ -140,6 +140,8 @@ export class UsersService {
     } finally {
       await queryRunner.release();
     }
+  }
+
   async findAll(search?: string, role?: UserRole, status?: UserStatus) {
     const userRepository = this.dataSource.getRepository(User);
     const queryBuilder = userRepository.createQueryBuilder('user')
