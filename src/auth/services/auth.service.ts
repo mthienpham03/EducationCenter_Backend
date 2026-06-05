@@ -23,17 +23,38 @@ export class AuthService {
   ) {}
 
   async login(loginDto: LoginDto) {
-    const user = await this.userRepository.findOne({ where: { email: loginDto.email } });
+    const user = await this.userRepository.findOne({
+      where: { email: loginDto.email },
+    });
 
     if (!user) {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
 
-    if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Tài khoản đã bị khóa hoặc chưa kích hoạt');
+    if (user.status === UserStatus.LOCKED) {
+      if (user.lockedUntil && new Date(user.lockedUntil) < new Date()) {
+        user.status = UserStatus.ACTIVE;
+        user.lockedUntil = null;
+        user.lockReason = null;
+        await this.userRepository.save(user);
+      } else {
+        const timeDetail = user.lockedUntil
+          ? `đến ${new Date(user.lockedUntil).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
+          : 'vô thời hạn';
+        throw new UnauthorizedException(
+          `Tài khoản của bạn đã bị khóa ${timeDetail}. Lý do: ${user.lockReason || 'Không có lý do cụ thể'}`,
+        );
+      }
+    } else if (user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException(
+        'Tài khoản đã bị khóa hoặc chưa kích hoạt',
+      );
     }
 
-    const isPasswordValid = await bcrypt.compare(loginDto.password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      user.passwordHash,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
@@ -48,7 +69,8 @@ export class AuthService {
 
     // Save session to Redis (for revocation and session management)
     // Key format: session:{userId}
-    const expiresInString = this.configService.get<string>('jwt.expiresIn') || '7d';
+    const expiresInString =
+      this.configService.get<string>('jwt.expiresIn') || '7d';
     let expirySeconds = 604800; // default 7 days
     if (expiresInString.endsWith('d')) {
       expirySeconds = parseInt(expiresInString) * 24 * 60 * 60;
@@ -101,7 +123,10 @@ export class AuthService {
       throw new UnauthorizedException('Người dùng không tồn tại');
     }
 
-    const isPasswordValid = await bcrypt.compare(oldPassword, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      oldPassword,
+      user.passwordHash,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Mật khẩu hiện tại không chính xác');
     }
@@ -132,7 +157,9 @@ export class AuthService {
     const redisKey = `otp:${email}`;
     const existingOtp = await this.redisClient.get(redisKey);
     if (existingOtp) {
-      throw new UnauthorizedException('Vui lòng đợi hết 60 giây trước khi yêu cầu mã mới');
+      throw new UnauthorizedException(
+        'Vui lòng đợi hết 60 giây trước khi yêu cầu mã mới',
+      );
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
@@ -141,7 +168,9 @@ export class AuthService {
     await this.redisClient.set(redisKey, otp, 'EX', 60);
 
     // Gửi mail
-    this.mailService.sendResetPasswordOtp(email, otp).catch(e => console.error(e));
+    this.mailService
+      .sendResetPasswordOtp(email, otp)
+      .catch((e) => console.error(e));
 
     return {
       success: true,
@@ -160,7 +189,9 @@ export class AuthService {
     const storedOtp = await this.redisClient.get(redisKey);
 
     if (!storedOtp || storedOtp !== otp) {
-      throw new UnauthorizedException('Mã xác nhận không chính xác hoặc đã hết hạn');
+      throw new UnauthorizedException(
+        'Mã xác nhận không chính xác hoặc đã hết hạn',
+      );
     }
 
     const user = await this.userRepository.findOne({ where: { email } });

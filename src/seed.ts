@@ -13,7 +13,9 @@ async function bootstrap() {
 
   // --- Seed default Admin ---
   const adminEmail = 'admin@educenter.com';
-  const existingAdmin = await userRepository.findOne({ where: { email: adminEmail } });
+  const existingAdmin = await userRepository.findOne({
+    where: { email: adminEmail },
+  });
 
   if (existingAdmin) {
     console.log('Admin account already exists. Skipping...');
@@ -38,7 +40,9 @@ async function bootstrap() {
 
   // --- Seed default Lecturer ---
   const lecturerEmail = 'lecturer@educenter.com';
-  const existingLecturer = await userRepository.findOne({ where: { email: lecturerEmail } });
+  const existingLecturer = await userRepository.findOne({
+    where: { email: lecturerEmail },
+  });
 
   if (existingLecturer) {
     console.log('Lecturer account already exists. Skipping...');
@@ -73,7 +77,9 @@ async function bootstrap() {
 
   // --- Seed default Student ---
   const studentEmail = 'student@educenter.com';
-  const existingStudent = await userRepository.findOne({ where: { email: studentEmail } });
+  const existingStudent = await userRepository.findOne({
+    where: { email: studentEmail },
+  });
 
   if (existingStudent) {
     console.log('Student account already exists. Skipping...');

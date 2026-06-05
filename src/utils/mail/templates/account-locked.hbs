@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Thông báo khóa tài khoản - EduCenter LMS</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+    }
+    .container {
+      max-width: 600px;
+      margin: 30px auto;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    .header {
+      background-color: #dc2626;
+      color: #ffffff;
+      padding: 20px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .content {
+      padding: 30px;
+    }
+    .content h2 {
+      color: #b91c1c;
+      font-size: 20px;
+    }
+    .info-box {
+      background-color: #fef2f2;
+      border-left: 4px solid #ef4444;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .info-box p {
+      margin: 5px 0;
+      font-size: 16px;
+    }
+    .footer {
+      background-color: #f1f5f9;
+      padding: 15px;
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Thông Báo Hệ Thống</h1>
+    </div>
+    
+    <div class="content">
+      <h2>Kính gửi {{fullName}},</h2>
+      <p>Chúng tôi tiếc phải thông báo rằng tài khoản đăng nhập của bạn trên hệ thống <strong>EduCenter LMS</strong> đã bị tạm khóa bởi quản trị viên.</p>
+      
+      <div class="info-box">
+        <p><strong>Tài khoản email:</strong> {{email}}</p>
+        <p><strong>Lý do khóa:</strong> {{reason}}</p>
+        <p><strong>Thời gian khóa:</strong> {{lockedDuration}}</p>
+      </div>
+      
+      <p>Trong thời gian tài khoản bị khóa, bạn sẽ không thể đăng nhập hoặc tham gia các hoạt động học tập/giảng dạy trên hệ thống.</p>
+      <p>Nếu bạn cho rằng đây là một sự nhầm lẫn hoặc cần hỗ trợ thêm, vui lòng liên hệ với Ban quản trị qua email support@educenter.edu.vn.</p>
+      
+      <p style="margin-top: 30px;">Trân trọng,<br>Ban quản trị EduCenter</p>
+    </div>
+    
+    <div class="footer">
+      <p>Email này được gửi tự động từ hệ thống. Vui lòng không trả lời email này.</p>
+      <p>&copy; 2026 EduCenter. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
