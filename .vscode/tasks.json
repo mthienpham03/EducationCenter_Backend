@@ -1,0 +1,89 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "run fix",
+			"type": "shell",
+			"command": "node fix.js",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "build project",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "fix compile",
+			"type": "shell",
+			"command": "node fix2.js",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "build project 2",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "fix paths",
+			"type": "shell",
+			"command": "node fix3.js",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "build project 3",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "remove files",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"-e",
+				"\"const fs = require('fs'); fs.unlinkSync('fix.js'); fs.unlinkSync('fix2.js'); fs.unlinkSync('fix3.js');\""
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "run remove",
+			"type": "shell",
+			"command": "node remove.js",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}
