@@ -10,6 +10,7 @@ import { LecturerProfile } from '../../lecturers/models/LecturerProfile.entity';
 import { StudentProfile } from '../../students/models/StudentProfile.entity';
 import { CreateLecturerDto, CreateStudentDto } from '../dto/create-user.dto';
 import { LockUserDto } from '../dto/lock-user.dto';
+import { UpdateLecturerDto, UpdateStudentDto } from '../dto/update-user.dto';
 import { MailService } from '../../utils/mail/services/mail.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -188,16 +189,8 @@ export class UsersService {
     const userRepository = this.dataSource.getRepository(User);
     const queryBuilder = userRepository
       .createQueryBuilder('user')
-      .select([
-        'user.id',
-        'user.email',
-        'user.fullName',
-        'user.phone',
-        'user.role',
-        'user.status',
-        'user.createdAt',
-        'user.lastLoginAt',
-      ]);
+      .leftJoinAndSelect('user.lecturerProfile', 'lecturerProfile')
+      .leftJoinAndSelect('user.studentProfile', 'studentProfile');
 
     if (search) {
       queryBuilder.andWhere(
@@ -219,7 +212,13 @@ export class UsersService {
 
     return {
       success: true,
-      data: users,
+      data: users.map((u) => {
+        const result = { ...u } as Omit<User, 'passwordHash'> & {
+          passwordHash?: string;
+        };
+        delete result.passwordHash;
+        return result;
+      }),
     };
   }
 
@@ -396,5 +395,170 @@ export class UsersService {
         status: user.status,
       },
     };
+  }
+
+  async updateLecturer(id: string, updateLecturerDto: UpdateLecturerDto) {
+    const { email, fullName, phone, specialization, experienceYears } =
+      updateLecturerDto;
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const userRepository = queryRunner.manager.getRepository(User);
+      const lecturerProfileRepository =
+        queryRunner.manager.getRepository(LecturerProfile);
+
+      const user = await userRepository.findOne({
+        where: { id },
+        relations: { lecturerProfile: true },
+      });
+
+      if (!user) {
+        throw new BadRequestException('Giảng viên không tồn tại');
+      }
+
+      if (user.role !== UserRole.LECTURER) {
+        throw new BadRequestException('Người dùng không phải là Giảng viên');
+      }
+
+      // Check email uniqueness if email is changed
+      if (email && email !== user.email) {
+        const existingEmail = await userRepository.findOne({ where: { email } });
+        if (existingEmail) {
+          throw new BadRequestException('Email này đã được sử dụng bởi người dùng khác');
+        }
+        user.email = email;
+      }
+
+      if (fullName !== undefined) user.fullName = fullName;
+      if (phone !== undefined) user.phone = phone;
+
+      // Update or create profile
+      let profile = user.lecturerProfile;
+      if (!profile) {
+        profile = lecturerProfileRepository.create({ userId: user.id });
+      }
+
+      if (specialization !== undefined) profile.specialization = specialization;
+      if (experienceYears !== undefined) profile.experienceYears = experienceYears;
+
+      await lecturerProfileRepository.save(profile);
+      const savedUser = await userRepository.save(user);
+      await queryRunner.commitTransaction();
+
+      // Exclude password Hash
+      const result = { ...savedUser } as Omit<User, 'passwordHash'> & {
+        passwordHash?: string;
+      };
+      delete result.passwordHash;
+
+      return {
+        success: true,
+        message: 'Cập nhật tài khoản Giảng viên thành công',
+        data: result,
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      if (error instanceof BadRequestException) throw error;
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(
+        'Có lỗi xảy ra khi cập nhật tài khoản giảng viên: ' + errorMessage,
+      );
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async updateStudent(id: string, updateStudentDto: UpdateStudentDto) {
+    const { email, fullName, phone, studentCode, dateOfBirth, address } =
+      updateStudentDto;
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const userRepository = queryRunner.manager.getRepository(User);
+      const studentProfileRepository =
+        queryRunner.manager.getRepository(StudentProfile);
+
+      const user = await userRepository.findOne({
+        where: { id },
+        relations: { studentProfile: true },
+      });
+
+      if (!user) {
+        throw new BadRequestException('Học viên không tồn tại');
+      }
+
+      if (user.role !== UserRole.STUDENT) {
+        throw new BadRequestException('Người dùng không phải là Học viên');
+      }
+
+      // Check email uniqueness if email is changed
+      if (email && email !== user.email) {
+        const existingEmail = await userRepository.findOne({ where: { email } });
+        if (existingEmail) {
+          throw new BadRequestException('Email này đã được sử dụng bởi người dùng khác');
+        }
+        user.email = email;
+      }
+
+      if (fullName !== undefined) user.fullName = fullName;
+      if (phone !== undefined) user.phone = phone;
+
+      // Update or create profile
+      let profile = user.studentProfile;
+      if (!profile) {
+        profile = studentProfileRepository.create({ userId: user.id });
+      }
+
+      // Check student code uniqueness if changed
+      if (studentCode !== undefined && studentCode !== profile.studentCode) {
+        const existingCode = await studentProfileRepository.findOne({
+          where: { studentCode },
+        });
+        if (existingCode) {
+          throw new BadRequestException('Mã học viên này đã tồn tại');
+        }
+        profile.studentCode = studentCode;
+      }
+
+      if (dateOfBirth !== undefined) {
+        profile.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+      }
+      if (address !== undefined) {
+        profile.address = address;
+      }
+
+      await studentProfileRepository.save(profile);
+      const savedUser = await userRepository.save(user);
+      await queryRunner.commitTransaction();
+
+      // Exclude password Hash
+      const result = { ...savedUser } as Omit<User, 'passwordHash'> & {
+        passwordHash?: string;
+      };
+      delete result.passwordHash;
+
+      return {
+        success: true,
+        message: 'Cập nhật tài khoản Học viên thành công',
+        data: result,
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      if (error instanceof BadRequestException) throw error;
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(
+        'Có lỗi xảy ra khi cập nhật tài khoản học viên: ' + errorMessage,
+      );
+    } finally {
+      await queryRunner.release();
+    }
   }
 }
