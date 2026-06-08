@@ -10,8 +10,10 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
+  Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import * as express from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -230,5 +232,24 @@ export class UsersController {
   })
   async importStudents(@UploadedFile() file: Express.Multer.File) {
     return this.usersService.importStudents(file);
+  }
+
+  @Get('import-students/template')
+  @ApiOperation({ summary: 'Tải file Excel mẫu để import học viên' })
+  @ApiResponse({
+    status: 200,
+    description: 'Tải file Excel thành công',
+  })
+  async getImportTemplate(@Res() res: express.Response) {
+    const buffer = await this.usersService.getImportTemplate();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=template-import-students.xlsx',
+    );
+    res.end(buffer);
   }
 }

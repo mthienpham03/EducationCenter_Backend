@@ -765,4 +765,18 @@ export class UsersService {
       data: results,
     };
   }
+
+  async getImportTemplate() {
+    const headers = [
+      ['Email', 'Họ và tên', 'Mã học viên', 'Số điện thoại', 'Ngày sinh', 'Địa chỉ'],
+      ['nguyenvana@gmail.com', 'Nguyễn Văn A', 'HV001', '0912345678', '2004-05-15', 'Hà Nội'],
+      ['tranvanb@gmail.com', 'Trần Văn B', 'HV002', '0987654321', '2003-10-20', 'Đà Nẵng'],
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(headers);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Template Import');
+
+    return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  }
 }
