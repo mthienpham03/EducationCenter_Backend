@@ -20,7 +20,7 @@ export class AuthService {
     private configService: ConfigService,
     @Inject('REDIS_CLIENT') private redisClient: Redis,
     private mailService: MailService,
-  ) {}
+  ) { }
 
   async login(loginDto: LoginDto) {
     const user = await this.userRepository.findOne({
@@ -149,8 +149,6 @@ export class AuthService {
 
     const user = await this.userRepository.findOne({ where: { email } });
     if (!user) {
-      // Vì lý do bảo mật, không trả về lỗi "Email không tồn tại" trực tiếp
-      // nhưng ở đây trong context thực hành, ta có thể trả về lỗi.
       throw new UnauthorizedException('Email không tồn tại trong hệ thống');
     }
 

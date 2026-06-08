@@ -15,6 +15,7 @@ import { MailService } from '../../utils/mail/services/mail.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import Redis from 'ioredis';
+import * as XLSX from 'xlsx';
 
 @Injectable()
 export class UsersService {
@@ -560,5 +561,208 @@ export class UsersService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async importStudents(file: Express.Multer.File) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('Vui lòng tải lên file Excel hợp lệ');
+    }
+
+    let workbook;
+    try {
+      workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    } catch (e) {
+      throw new BadRequestException('Không thể đọc file Excel. Vui lòng kiểm tra lại định dạng file.');
+    }
+
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+
+    if (rows.length <= 1) {
+      throw new BadRequestException('File Excel không có dữ liệu hoặc thiếu tiêu đề');
+    }
+
+    const headers = rows[0].map((h) => String(h || '').trim().toLowerCase());
+    const emailIdx = headers.findIndex((h) => h.includes('email'));
+    const nameIdx = headers.findIndex(
+      (h) => h.includes('tên') || h.includes('name') || h.includes('họ'),
+    );
+    const codeIdx = headers.findIndex((h) => h.includes('mã') || h.includes('code'));
+    const phoneIdx = headers.findIndex(
+      (h) => h.includes('điện thoại') || h.includes('phone') || h.includes('sđt'),
+    );
+    const dobIdx = headers.findIndex(
+      (h) => h.includes('sinh') || h.includes('birth') || h.includes('dob'),
+    );
+    const addressIdx = headers.findIndex(
+      (h) => h.includes('địa chi') || h.includes('địa chỉ') || h.includes('address'),
+    );
+
+    if (emailIdx === -1 || nameIdx === -1 || codeIdx === -1) {
+      throw new BadRequestException(
+        'File Excel phải chứa các cột bắt buộc: Email, Họ và Tên, Mã học viên',
+      );
+    }
+
+    const results = {
+      successCount: 0,
+      errorCount: 0,
+      details: [] as {
+        row: number;
+        email?: string;
+        studentCode?: string;
+        success: boolean;
+        message: string;
+      }[],
+    };
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      // Skip completely empty rows
+      if (!row || row.length === 0 || row.every((val) => val === undefined || val === null || val === '')) {
+        continue;
+      }
+
+      const email = String(row[emailIdx] || '').trim();
+      const fullName = String(row[nameIdx] || '').trim();
+      const studentCode = String(row[codeIdx] || '').trim();
+      const phone =
+        phoneIdx !== -1 && row[phoneIdx] !== undefined && row[phoneIdx] !== null
+          ? String(row[phoneIdx]).trim()
+          : null;
+      const rawDob = dobIdx !== -1 ? row[dobIdx] : null;
+      const address =
+        addressIdx !== -1 && row[addressIdx] !== undefined && row[addressIdx] !== null
+          ? String(row[addressIdx]).trim()
+          : null;
+
+      // Basic validation
+      if (!email || !fullName || !studentCode) {
+        results.errorCount++;
+        results.details.push({
+          row: i + 1,
+          email: email || undefined,
+          studentCode: studentCode || undefined,
+          success: false,
+          message: 'Thiếu thông tin bắt buộc (Email, Họ và Tên, hoặc Mã học viên)',
+        });
+        continue;
+      }
+
+      // Email formatting validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        results.errorCount++;
+        results.details.push({
+          row: i + 1,
+          email,
+          studentCode,
+          success: false,
+          message: 'Email không đúng định dạng',
+        });
+        continue;
+      }
+
+      let dateOfBirth: Date | null = null;
+      if (rawDob !== undefined && rawDob !== null && rawDob !== '') {
+        if (typeof rawDob === 'number') {
+          // Convert Excel date serial number to JS Date
+          dateOfBirth = new Date((rawDob - 25569) * 86400 * 1000);
+        } else {
+          const parsedDate = new Date(String(rawDob).trim());
+          if (!isNaN(parsedDate.getTime())) {
+            dateOfBirth = parsedDate;
+          }
+        }
+      }
+
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      try {
+        const userRepository = queryRunner.manager.getRepository(User);
+        const studentProfileRepository =
+          queryRunner.manager.getRepository(StudentProfile);
+
+        // Check unique email
+        const existingUser = await userRepository.findOne({ where: { email } });
+        if (existingUser) {
+          throw new BadRequestException('Email đã tồn tại trong hệ thống');
+        }
+
+        // Check unique studentCode
+        const existingCode = await studentProfileRepository.findOne({
+          where: { studentCode },
+        });
+        if (existingCode) {
+          throw new BadRequestException('Mã học viên đã tồn tại');
+        }
+
+        // Generate random password
+        const plainPassword = this.generateRandomPassword();
+        const passwordHash = await bcrypt.hash(plainPassword, 10);
+
+        // Create user
+        const user = userRepository.create({
+          email,
+          passwordHash,
+          fullName,
+          phone,
+          role: UserRole.STUDENT,
+          status: UserStatus.ACTIVE,
+        });
+        const savedUser = await userRepository.save(user);
+
+        // Create student profile
+        const profile = studentProfileRepository.create({
+          userId: savedUser.id,
+          studentCode,
+          dateOfBirth,
+          address,
+        });
+        await studentProfileRepository.save(profile);
+
+        await queryRunner.commitTransaction();
+
+        // Send email in background
+        this.mailService
+          .sendAccountCreatedEmail(
+            email,
+            fullName,
+            plainPassword,
+            UserRole.STUDENT,
+          )
+          .catch((e) => console.error(`Error sending mail to ${email}:`, e));
+
+        results.successCount++;
+        results.details.push({
+          row: i + 1,
+          email,
+          studentCode,
+          success: true,
+          message: 'Tạo học viên thành công',
+        });
+      } catch (err: any) {
+        await queryRunner.rollbackTransaction();
+        results.errorCount++;
+        results.details.push({
+          row: i + 1,
+          email,
+          studentCode,
+          success: false,
+          message: err.message || 'Có lỗi khi tạo tài khoản',
+        });
+      } finally {
+        await queryRunner.release();
+      }
+    }
+
+    return {
+      success: true,
+      message: `Import hoàn tất. Thành công: ${results.successCount}, Thất bại: ${results.errorCount}`,
+      data: results,
+    };
   }
 }

@@ -8,13 +8,18 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
 import { UsersService } from '../services/users.service';
 import { CreateLecturerDto, CreateStudentDto } from '../dto/create-user.dto';
@@ -201,5 +206,29 @@ export class UsersController {
     @Body() updateStudentDto: UpdateStudentDto,
   ) {
     return this.usersService.updateStudent(id, updateStudentDto);
+  }
+
+  @Post('import-students')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Admin import danh sách học viên từ file Excel' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'File Excel (.xlsx, .xls) chứa danh sách học viên',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Import hoàn tất và trả về báo cáo kết quả chi tiết',
+  })
+  async importStudents(@UploadedFile() file: Express.Multer.File) {
+    return this.usersService.importStudents(file);
   }
 }
