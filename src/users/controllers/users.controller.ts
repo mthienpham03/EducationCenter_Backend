@@ -8,17 +8,25 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  Res,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import * as express from 'express';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
 import { UsersService } from '../services/users.service';
 import { CreateLecturerDto, CreateStudentDto } from '../dto/create-user.dto';
 import { LockUserDto } from '../dto/lock-user.dto';
+import { UpdateLecturerDto, UpdateStudentDto } from '../dto/update-user.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -166,5 +174,102 @@ export class UsersController {
   })
   async unlockUser(@Param('id') id: string) {
     return this.usersService.unlockUser(id);
+  }
+
+  @Patch('lecturers/:id')
+  @ApiOperation({ summary: 'Admin cập nhật thông tin Giảng viên' })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật tài khoản Giảng viên thành công',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Dữ liệu không hợp lệ hoặc Email đã tồn tại',
+  })
+  async updateLecturer(
+    @Param('id') id: string,
+    @Body() updateLecturerDto: UpdateLecturerDto,
+  ) {
+    return this.usersService.updateLecturer(id, updateLecturerDto);
+  }
+
+  @Patch('students/:id')
+  @ApiOperation({ summary: 'Admin cập nhật thông tin Học viên' })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật tài khoản Học viên thành công',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Dữ liệu không hợp lệ hoặc Email/Mã học viên đã tồn tại',
+  })
+  async updateStudent(
+    @Param('id') id: string,
+    @Body() updateStudentDto: UpdateStudentDto,
+  ) {
+    return this.usersService.updateStudent(id, updateStudentDto);
+  }
+
+  @Post('import-students')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Admin import danh sách học viên từ file Excel' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'File Excel (.xlsx, .xls) chứa danh sách học viên',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Import hoàn tất và trả về báo cáo kết quả chi tiết',
+  })
+  async importStudents(@UploadedFile() file: Express.Multer.File) {
+    return this.usersService.importStudents(file);
+  }
+
+  @Get('import-students/template')
+  @ApiOperation({ summary: 'Tải file Excel mẫu để import học viên' })
+  @ApiResponse({
+    status: 200,
+    description: 'Tải file Excel thành công',
+  })
+  async getImportTemplate(@Res() res: express.Response) {
+    const buffer = await this.usersService.getImportTemplate();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=template-import-students.xlsx',
+    );
+    res.end(buffer);
+  }
+
+  @Post('upload-avatar')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Admin upload ảnh đại diện cho giảng viên mới' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'File ảnh đại diện',
+        },
+      },
+    },
+  })
+  async uploadAvatar(@UploadedFile() file: Express.Multer.File) {
+    return this.usersService.uploadLecturerAvatar(file);
   }
 }

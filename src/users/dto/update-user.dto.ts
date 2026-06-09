@@ -1,6 +1,5 @@
 import {
   IsEmail,
-  IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
@@ -8,19 +7,19 @@ import {
   IsInt,
   Min,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
-export class CreateLecturerDto {
-  @ApiProperty({ description: 'Email đăng nhập của giảng viên' })
+export class UpdateLecturerDto {
+  @ApiPropertyOptional({ description: 'Email mới của giảng viên' })
+  @IsOptional()
   @IsEmail({}, { message: 'Email không đúng định dạng' })
-  @IsNotEmpty({ message: 'Email không được để trống' })
-  email: string;
+  email?: string;
 
-  @ApiProperty({ description: 'Họ và tên giảng viên' })
+  @ApiPropertyOptional({ description: 'Họ và tên giảng viên' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Họ và tên không được để trống' })
   @MaxLength(255)
-  fullName: string;
+  fullName?: string;
 
   @ApiPropertyOptional({ description: 'Số điện thoại' })
   @IsOptional()
@@ -39,24 +38,19 @@ export class CreateLecturerDto {
   @IsInt()
   @Min(0)
   experienceYears?: number;
-
-  @ApiPropertyOptional({ description: 'Ảnh đại diện của giảng viên' })
-  @IsOptional()
-  @IsString()
-  avatarUrl?: string;
 }
 
-export class CreateStudentDto {
-  @ApiProperty({ description: 'Email đăng nhập của học viên' })
+export class UpdateStudentDto {
+  @ApiPropertyOptional({ description: 'Email mới của học viên' })
+  @IsOptional()
   @IsEmail({}, { message: 'Email không đúng định dạng' })
-  @IsNotEmpty({ message: 'Email không được để trống' })
-  email: string;
+  email?: string;
 
-  @ApiProperty({ description: 'Họ và tên học viên' })
+  @ApiPropertyOptional({ description: 'Họ và tên học viên' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Họ và tên không được để trống' })
   @MaxLength(255)
-  fullName: string;
+  fullName?: string;
 
   @ApiPropertyOptional({ description: 'Số điện thoại' })
   @IsOptional()
@@ -64,11 +58,11 @@ export class CreateStudentDto {
   @MaxLength(20)
   phone?: string;
 
-  @ApiProperty({ description: 'Mã học viên (duy nhất)' })
+  @ApiPropertyOptional({ description: 'Mã học viên (duy nhất)' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Mã học viên không được để trống' })
   @MaxLength(100)
-  studentCode: string;
+  studentCode?: string;
 
   @ApiPropertyOptional({ description: 'Ngày sinh (YYYY-MM-DD)' })
   @IsOptional()
