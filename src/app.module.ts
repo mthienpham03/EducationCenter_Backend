@@ -13,6 +13,8 @@ import { RedisModule } from './utils/redis/redis.module';
 import { MailModule } from './utils/mail/modules/mail.module';
 import { UsersModule } from './users/modules/users.module';
 import { SpecializationsModule } from './specializations/modules/specializations.module';
+import { CoursesModule } from './courses/modules/courses.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -26,6 +28,7 @@ import { SpecializationsModule } from './specializations/modules/specializations
     AuthModule,
     UsersModule,
     SpecializationsModule,
+    CoursesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
