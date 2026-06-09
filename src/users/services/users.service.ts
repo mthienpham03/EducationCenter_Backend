@@ -18,6 +18,7 @@ import Redis from 'ioredis';
 import * as XLSX from 'xlsx';
 import { CloudinaryService } from '../../utils/cloudinary/services/cloudinary.service';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { Specialization } from '../../specializations/models/Specialization.entity';
 
 @Injectable()
 export class UsersService {
@@ -33,7 +34,7 @@ export class UsersService {
   }
 
   async createLecturer(createLecturerDto: CreateLecturerDto) {
-    const { email, fullName, phone, specialization, experienceYears, avatarUrl } =
+    const { email, fullName, phone, specializationIds, experienceYears, avatarUrl } =
       createLecturerDto;
 
     // Start a transaction
@@ -68,10 +69,19 @@ export class UsersService {
       });
       const savedUser = await userRepository.save(user);
 
+      // Fetch specializations
+      let specializations: Specialization[] = [];
+      if (specializationIds && specializationIds.length > 0) {
+        const specializationRepository = queryRunner.manager.getRepository(Specialization);
+        specializations = await specializationRepository.createQueryBuilder('s')
+          .where('s.id IN (:...ids)', { ids: specializationIds })
+          .getMany();
+      }
+
       // Create LecturerProfile
       const lecturerProfile = lecturerProfileRepository.create({
         userId: savedUser.id,
-        specialization,
+        specializations,
         experienceYears,
       });
       await lecturerProfileRepository.save(lecturerProfile);
@@ -195,11 +205,12 @@ export class UsersService {
     const queryBuilder = userRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.lecturerProfile', 'lecturerProfile')
+      .leftJoinAndSelect('lecturerProfile.specializations', 'specializations')
       .leftJoinAndSelect('user.studentProfile', 'studentProfile');
 
     if (search) {
       queryBuilder.andWhere(
-        '(user.fullName ILIKE :search OR user.email ILIKE :search OR user.phone ILIKE :search)',
+        '(user.fullName ILIKE :search OR user.email ILIKE :search OR user.phone ILIKE :search OR specializations.name ILIKE :search OR specializations.code ILIKE :search)',
         { search: `%${search}%` },
       );
     }
@@ -269,11 +280,12 @@ export class UsersService {
     const queryBuilder = userRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.lecturerProfile', 'lecturerProfile')
+      .leftJoinAndSelect('lecturerProfile.specializations', 'specializations')
       .where('user.role = :role', { role: UserRole.LECTURER });
 
     if (search) {
       queryBuilder.andWhere(
-        '(user.fullName ILIKE :search OR user.email ILIKE :search OR user.phone ILIKE :search OR lecturerProfile.specialization ILIKE :search)',
+        '(user.fullName ILIKE :search OR user.email ILIKE :search OR user.phone ILIKE :search OR specializations.name ILIKE :search OR specializations.code ILIKE :search)',
         { search: `%${search}%` },
       );
     }
@@ -403,7 +415,7 @@ export class UsersService {
   }
 
   async updateLecturer(id: string, updateLecturerDto: UpdateLecturerDto) {
-    const { email, fullName, phone, specialization, experienceYears } =
+    const { email, fullName, phone, specializationIds, experienceYears } =
       updateLecturerDto;
 
     const queryRunner = this.dataSource.createQueryRunner();
@@ -417,7 +429,7 @@ export class UsersService {
 
       const user = await userRepository.findOne({
         where: { id },
-        relations: { lecturerProfile: true },
+        relations: { lecturerProfile: { specializations: true } },
       });
 
       if (!user) {
@@ -446,8 +458,18 @@ export class UsersService {
         profile = lecturerProfileRepository.create({ userId: user.id });
       }
 
-      if (specialization !== undefined) profile.specialization = specialization;
       if (experienceYears !== undefined) profile.experienceYears = experienceYears;
+
+      if (specializationIds !== undefined) {
+        let specializations: Specialization[] = [];
+        if (specializationIds.length > 0) {
+          const specializationRepository = queryRunner.manager.getRepository(Specialization);
+          specializations = await specializationRepository.createQueryBuilder('s')
+            .where('s.id IN (:...ids)', { ids: specializationIds })
+            .getMany();
+        }
+        profile.specializations = specializations;
+      }
 
       await lecturerProfileRepository.save(profile);
       const savedUser = await userRepository.save(user);
@@ -788,7 +810,7 @@ export class UsersService {
     const userRepository = this.dataSource.getRepository(User);
     const relations =
       role === UserRole.LECTURER
-        ? { lecturerProfile: true }
+        ? { lecturerProfile: { specializations: true } }
         : role === UserRole.STUDENT
           ? { studentProfile: true }
           : {};
@@ -850,7 +872,7 @@ export class UsersService {
         where: { id: userId },
         relations:
           role === UserRole.LECTURER
-            ? { lecturerProfile: true }
+            ? { lecturerProfile: { specializations: true } }
             : role === UserRole.STUDENT
               ? { studentProfile: true }
               : {},
@@ -881,8 +903,15 @@ export class UsersService {
           profile = lecturerProfileRepository.create({ userId: user.id });
         }
 
-        if (updateDto.specialization !== undefined) {
-          profile.specialization = updateDto.specialization;
+        if (updateDto.specializationIds !== undefined) {
+          let specializations: Specialization[] = [];
+          if (updateDto.specializationIds.length > 0) {
+            const specializationRepository = queryRunner.manager.getRepository(Specialization);
+            specializations = await specializationRepository.createQueryBuilder('s')
+              .where('s.id IN (:...ids)', { ids: updateDto.specializationIds })
+              .getMany();
+          }
+          profile.specializations = specializations;
         }
         if (updateDto.experienceYears !== undefined) {
           profile.experienceYears = updateDto.experienceYears;

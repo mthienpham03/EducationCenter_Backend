@@ -6,8 +6,11 @@ import {
   PrimaryColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToMany,
+  JoinTable,
 } from 'typeorm';
 import { User } from '../../users/models/User.entity';
+import { Specialization } from '../../specializations/models/Specialization.entity';
 
 @Entity('lecturer_profiles')
 export class LecturerProfile {
@@ -18,8 +21,13 @@ export class LecturerProfile {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  specialization: string | null;
+  @ManyToMany(() => Specialization, (specialization) => specialization.lecturerProfiles, { cascade: true })
+  @JoinTable({
+    name: 'lecturer_profiles_specializations',
+    joinColumn: { name: 'lecturer_id', referencedColumnName: 'userId' },
+    inverseJoinColumn: { name: 'specialization_id', referencedColumnName: 'id' },
+  })
+  specializations: Specialization[];
 
   @Column({ name: 'experience_years', type: 'int', nullable: true })
   experienceYears: number | null;

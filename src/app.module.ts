@@ -12,6 +12,7 @@ import cloudinaryConfig from './configs/cloudinary.config';
 import { RedisModule } from './utils/redis/redis.module';
 import { MailModule } from './utils/mail/modules/mail.module';
 import { UsersModule } from './users/modules/users.module';
+import { SpecializationsModule } from './specializations/modules/specializations.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -24,6 +25,7 @@ import { UsersModule } from './users/modules/users.module';
     MailModule,
     AuthModule,
     UsersModule,
+    SpecializationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
