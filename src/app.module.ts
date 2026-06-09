@@ -8,6 +8,7 @@ import databaseConfig from './configs/database.config';
 import jwtConfig from './configs/jwt.config';
 import redisConfig from './configs/redis.config';
 import mailConfig from './configs/mail.config';
+import cloudinaryConfig from './configs/cloudinary.config';
 import { RedisModule } from './utils/redis/redis.module';
 import { MailModule } from './utils/mail/modules/mail.module';
 import { UsersModule } from './users/modules/users.module';
@@ -15,7 +16,7 @@ import { UsersModule } from './users/modules/users.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, jwtConfig, redisConfig, mailConfig],
+      load: [databaseConfig, jwtConfig, redisConfig, mailConfig, cloudinaryConfig],
       envFilePath: '.env',
     }),
     DatabaseModule,

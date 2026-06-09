@@ -39,6 +39,11 @@ export class CreateLecturerDto {
   @IsInt()
   @Min(0)
   experienceYears?: number;
+
+  @ApiPropertyOptional({ description: 'Ảnh đại diện của giảng viên' })
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string;
 }
 
 export class CreateStudentDto {

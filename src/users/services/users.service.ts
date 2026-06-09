@@ -16,6 +16,8 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import Redis from 'ioredis';
 import * as XLSX from 'xlsx';
+import { CloudinaryService } from '../../utils/cloudinary/services/cloudinary.service';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 
 @Injectable()
 export class UsersService {
@@ -23,6 +25,7 @@ export class UsersService {
     private dataSource: DataSource,
     private mailService: MailService,
     @Inject('REDIS_CLIENT') private redisClient: Redis,
+    private cloudinaryService: CloudinaryService,
   ) {}
 
   private generateRandomPassword(length = 8): string {
@@ -30,7 +33,7 @@ export class UsersService {
   }
 
   async createLecturer(createLecturerDto: CreateLecturerDto) {
-    const { email, fullName, phone, specialization, experienceYears } =
+    const { email, fullName, phone, specialization, experienceYears, avatarUrl } =
       createLecturerDto;
 
     // Start a transaction
@@ -59,6 +62,7 @@ export class UsersService {
         passwordHash,
         fullName,
         phone,
+        avatarUrl,
         role: UserRole.LECTURER,
         status: UserStatus.ACTIVE,
       });
@@ -778,5 +782,218 @@ export class UsersService {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Template Import');
 
     return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  }
+
+  async getProfile(userId: string, role: UserRole) {
+    const userRepository = this.dataSource.getRepository(User);
+    const relations =
+      role === UserRole.LECTURER
+        ? { lecturerProfile: true }
+        : role === UserRole.STUDENT
+          ? { studentProfile: true }
+          : {};
+
+    const user = await userRepository.findOne({
+      where: { id: userId },
+      relations,
+    });
+
+    if (!user) {
+      throw new BadRequestException('Người dùng không tồn tại');
+    }
+
+    const result = { ...user } as Omit<User, 'passwordHash'> & {
+      passwordHash?: string;
+    };
+    delete result.passwordHash;
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  private extractPublicIdFromUrl(url: string): string | null {
+    if (!url || !url.includes('cloudinary.com')) return null;
+    try {
+      const parts = url.split('/upload/');
+      if (parts.length < 2) return null;
+      const pathAfterUpload = parts[1];
+      const pathSegments = pathAfterUpload.split('/');
+      if (pathSegments[0].match(/^v\d+$/)) {
+        pathSegments.shift();
+      }
+      const publicIdWithExt = pathSegments.join('/');
+      const lastDotIndex = publicIdWithExt.lastIndexOf('.');
+      if (lastDotIndex === -1) return publicIdWithExt;
+      return publicIdWithExt.substring(0, lastDotIndex);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async updateProfile(userId: string, role: UserRole, updateDto: UpdateProfileDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    const publicIdsToDelete: string[] = [];
+
+    try {
+      const userRepository = queryRunner.manager.getRepository(User);
+      const lecturerProfileRepository =
+        queryRunner.manager.getRepository(LecturerProfile);
+      const studentProfileRepository =
+        queryRunner.manager.getRepository(StudentProfile);
+
+      const user = await userRepository.findOne({
+        where: { id: userId },
+        relations:
+          role === UserRole.LECTURER
+            ? { lecturerProfile: true }
+            : role === UserRole.STUDENT
+              ? { studentProfile: true }
+              : {},
+      });
+
+      if (!user) {
+        throw new BadRequestException('Người dùng không tồn tại');
+      }
+
+      // Check avatar replacement to clean up old avatar
+      if (updateDto.avatarUrl !== undefined && updateDto.avatarUrl !== user.avatarUrl) {
+        if (user.avatarUrl) {
+          const oldAvatarPublicId = this.extractPublicIdFromUrl(user.avatarUrl);
+          if (oldAvatarPublicId) {
+            publicIdsToDelete.push(oldAvatarPublicId);
+          }
+        }
+        user.avatarUrl = updateDto.avatarUrl;
+      }
+
+      // Update common fields
+      if (updateDto.fullName !== undefined) user.fullName = updateDto.fullName;
+      if (updateDto.phone !== undefined) user.phone = updateDto.phone;
+
+      if (role === UserRole.LECTURER) {
+        let profile = user.lecturerProfile;
+        if (!profile) {
+          profile = lecturerProfileRepository.create({ userId: user.id });
+        }
+
+        if (updateDto.specialization !== undefined) {
+          profile.specialization = updateDto.specialization;
+        }
+        if (updateDto.experienceYears !== undefined) {
+          profile.experienceYears = updateDto.experienceYears;
+        }
+        if (updateDto.bio !== undefined) {
+          profile.bio = updateDto.bio;
+        }
+
+        // Compare and cleanup old certificate images on Cloudinary
+        if (updateDto.certificates !== undefined) {
+          const newCerts = updateDto.certificates || [];
+          const oldCerts = (profile.certificates as any[]) || [];
+
+          // Collect all public IDs in old certificates
+          const oldPublicIds = new Set<string>();
+          oldCerts.forEach((c) => {
+            if (c.frontImagePublicId) oldPublicIds.add(c.frontImagePublicId);
+            if (c.backImagePublicId) oldPublicIds.add(c.backImagePublicId);
+          });
+
+          // Collect all public IDs in new certificates
+          const newPublicIds = new Set<string>();
+          newCerts.forEach((c) => {
+            if (c.frontImagePublicId) newPublicIds.add(c.frontImagePublicId);
+            if (c.backImagePublicId) newPublicIds.add(c.backImagePublicId);
+          });
+
+          // Any public ID that is in old but not in new should be deleted
+          oldPublicIds.forEach((id) => {
+            if (!newPublicIds.has(id)) {
+              publicIdsToDelete.push(id);
+            }
+          });
+
+          profile.certificates = newCerts;
+        }
+
+        await lecturerProfileRepository.save(profile);
+      } else if (role === UserRole.STUDENT) {
+        let profile = user.studentProfile;
+        if (!profile) {
+          profile = studentProfileRepository.create({ userId: user.id });
+        }
+
+        if (updateDto.dateOfBirth !== undefined) {
+          profile.dateOfBirth = updateDto.dateOfBirth
+            ? new Date(updateDto.dateOfBirth)
+            : null;
+        }
+        if (updateDto.address !== undefined) {
+          profile.address = updateDto.address;
+        }
+
+        await studentProfileRepository.save(profile);
+      }
+
+      const savedUser = await userRepository.save(user);
+      await queryRunner.commitTransaction();
+
+      // Trigger asynchronous deletion of replaced files on Cloudinary in the background
+      if (publicIdsToDelete.length > 0) {
+        Promise.all(
+          publicIdsToDelete.map((pid) =>
+            this.cloudinaryService
+              .deleteFile(pid)
+              .catch((err) =>
+                console.error(`Failed to delete file ${pid} from Cloudinary:`, err),
+              ),
+          ),
+        ).catch((err) => console.error('Cloudinary cleanup error:', err));
+      }
+
+      const result = { ...savedUser } as Omit<User, 'passwordHash'> & {
+        passwordHash?: string;
+      };
+      delete result.passwordHash;
+
+      return {
+        success: true,
+        message: 'Cập nhật thông tin cá nhân thành công',
+        data: result,
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new BadRequestException('Cập nhật thất bại: ' + errorMessage);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async uploadLecturerAvatar(file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Vui lòng chọn file ảnh để upload');
+    }
+    try {
+      const result = await this.cloudinaryService.uploadFile(file, {
+        folder: 'educenter/lecturers/avatars',
+        resource_type: 'image',
+      });
+      return {
+        success: true,
+        data: {
+          url: result.secure_url,
+          publicId: result.public_id,
+        },
+      };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new BadRequestException('Upload avatar thất bại: ' + msg);
+    }
   }
 }

@@ -252,4 +252,24 @@ export class UsersController {
     );
     res.end(buffer);
   }
+
+  @Post('upload-avatar')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Admin upload ảnh đại diện cho giảng viên mới' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'File ảnh đại diện',
+        },
+      },
+    },
+  })
+  async uploadAvatar(@UploadedFile() file: Express.Multer.File) {
+    return this.usersService.uploadLecturerAvatar(file);
+  }
 }
