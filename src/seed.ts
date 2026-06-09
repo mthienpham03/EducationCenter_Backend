@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { User, UserRole, UserStatus } from './users/models/User.entity';
 import { LecturerProfile } from './lecturers/models/LecturerProfile.entity';
 import { StudentProfile } from './students/models/StudentProfile.entity';
+import { Specialization } from './specializations/models/Specialization.entity';
 import * as bcrypt from 'bcrypt';
 
 async function bootstrap() {
@@ -61,10 +62,21 @@ async function bootstrap() {
 
     const savedLecturer = await userRepository.save(newLecturer);
 
+    const specializationRepository = dataSource.getRepository(Specialization);
+    let spec = await specializationRepository.findOne({ where: { code: 'IT' } });
+    if (!spec) {
+      spec = specializationRepository.create({
+        code: 'IT',
+        name: 'Information Technology',
+        description: 'Chuyên ngành Công nghệ thông tin',
+      });
+      spec = await specializationRepository.save(spec);
+    }
+
     const lecturerProfileRepository = dataSource.getRepository(LecturerProfile);
     const lecturerProfile = lecturerProfileRepository.create({
       userId: savedLecturer.id,
-      specialization: 'Information Technology',
+      specializations: [spec],
       experienceYears: 5,
       bio: 'Lecturer in Computer Science with 5 years of experience.',
     });

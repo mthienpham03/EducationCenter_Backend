@@ -6,6 +6,7 @@ import {
   IsDateString,
   IsInt,
   Min,
+  IsArray,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -27,11 +28,11 @@ export class UpdateLecturerDto {
   @MaxLength(20)
   phone?: string;
 
-  @ApiPropertyOptional({ description: 'Chuyên ngành giảng dạy' })
+  @ApiPropertyOptional({ description: 'Danh sách ID chuyên ngành giảng dạy', type: [String] })
   @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  specialization?: string;
+  @IsArray()
+  @IsString({ each: true })
+  specializationIds?: string[];
 
   @ApiPropertyOptional({ description: 'Số năm kinh nghiệm' })
   @IsOptional()

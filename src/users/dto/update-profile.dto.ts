@@ -47,10 +47,11 @@ export class UpdateProfileDto {
   avatarUrl?: string;
 
   // Lecturer specific fields
-  @ApiProperty({ required: false })
-  @IsString()
+  @ApiProperty({ required: false, type: [String] })
+  @IsArray()
+  @IsString({ each: true })
   @IsOptional()
-  specialization?: string;
+  specializationIds?: string[];
 
   @ApiProperty({ required: false })
   @IsNumber()
