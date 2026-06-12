@@ -58,3 +58,25 @@ export class EnrollStudentDto {
   @IsNotEmpty({ message: 'ID Học viên không được để trống' })
   studentId: string;
 }
+
+export class TransferStudentDto {
+  @ApiProperty({ description: 'ID Học viên (UUID)', example: 'a06df53a-c603-4f9e-a89e-cf7bb523a7bb' })
+  @IsUUID('all', { message: 'ID Học viên phải là UUID hợp lệ' })
+  @IsNotEmpty({ message: 'ID Học viên không được để trống' })
+  studentId: string;
+
+  @ApiProperty({ description: 'ID Lớp học hiện tại (UUID)', example: 'b07df53a-c603-4f9e-a89e-cf7bb523a7bb' })
+  @IsUUID('all', { message: 'ID Lớp học nguồn phải là UUID hợp lệ' })
+  @IsNotEmpty({ message: 'ID Lớp học nguồn không được để trống' })
+  fromClassId: string;
+
+  @ApiProperty({ description: 'ID Lớp học mới muốn chuyển tới (UUID)', example: 'c08df53a-c603-4f9e-a89e-cf7bb523a7bb' })
+  @IsUUID('all', { message: 'ID Lớp học đích phải là UUID hợp lệ' })
+  @IsNotEmpty({ message: 'ID Lớp học đích không được để trống' })
+  toClassId: string;
+
+  @ApiPropertyOptional({ description: 'Lý do chuyển lớp', example: 'Trùng lịch làm việc cá nhân' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
