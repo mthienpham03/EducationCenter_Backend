@@ -23,7 +23,7 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../users/models/User.entity';
 import { CoursesService } from '../services/courses.service';
 import { CreateCourseDto, UpdateCourseDto } from '../dto/course.dto';
-import { CreateClassDto, UpdateClassDto, AssignLecturerDto, EnrollStudentDto } from '../dto/class.dto';
+import { CreateClassDto, UpdateClassDto, AssignLecturerDto, EnrollStudentDto, TransferStudentDto } from '../dto/class.dto';
 
 @ApiTags('Courses & Classes Management')
 @ApiBearerAuth()
@@ -97,6 +97,35 @@ export class CoursesController {
   @ApiResponse({ status: 200, description: 'Lấy danh sách lớp học thành công' })
   async findClassesByCourse(@Param('courseId') courseId: string) {
     return this.coursesService.findClassesByCourse(courseId);
+  }
+
+  // ==================== CLASS TRANSFER & HISTORY ====================
+
+  @Post('classes/transfer')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Admin thực hiện điều chuyển lớp cho học viên trong cùng một khóa học' })
+  @ApiResponse({ status: 201, description: 'Điều chuyển lớp thành công' })
+  async transferStudent(@Req() req, @Body() dto: TransferStudentDto) {
+    return this.coursesService.transferStudent(dto, req.user.id);
+  }
+
+  @Get('classes/transfer-histories')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Admin xem danh sách lịch sử biến động/điều chuyển lớp của học viên' })
+  @ApiQuery({ name: 'studentId', required: false, description: 'Lọc theo ID học viên' })
+  @ApiQuery({ name: 'courseId', required: false, description: 'Lọc theo ID khóa học' })
+  @ApiQuery({ name: 'fromClassId', required: false, description: 'Lọc theo ID lớp cũ' })
+  @ApiQuery({ name: 'toClassId', required: false, description: 'Lọc theo ID lớp mới' })
+  @ApiResponse({ status: 200, description: 'Lấy danh sách lịch sử thành công' })
+  async findTransferHistories(
+    @Query('studentId') studentId?: string,
+    @Query('courseId') courseId?: string,
+    @Query('fromClassId') fromClassId?: string,
+    @Query('toClassId') toClassId?: string,
+  ) {
+    return this.coursesService.findTransferHistories({ studentId, courseId, fromClassId, toClassId });
   }
 
   @Get('classes/:id')
@@ -177,4 +206,5 @@ export class CoursesController {
   async findStudentsByClass(@Param('classId') classId: string) {
     return this.coursesService.findStudentsByClass(classId);
   }
+
 }
