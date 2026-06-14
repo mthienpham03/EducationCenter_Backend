@@ -5,9 +5,10 @@ import { Course } from '../models/Course.entity';
 import { Class } from '../models/Class.entity';
 import { Enrollment, EnrollmentStatus } from '../models/Enrollment.entity';
 import { TeachingAssignment } from '../models/TeachingAssignment.entity';
+import { ClassTransferHistory } from '../models/ClassTransferHistory.entity';
 import { User, UserRole, UserStatus } from '../../users/models/User.entity';
 import { CreateCourseDto, UpdateCourseDto } from '../dto/course.dto';
-import { CreateClassDto, UpdateClassDto, AssignLecturerDto, EnrollStudentDto } from '../dto/class.dto';
+import { CreateClassDto, UpdateClassDto, AssignLecturerDto, EnrollStudentDto, TransferStudentDto } from '../dto/class.dto';
 
 @Injectable()
 export class CoursesService {
@@ -22,6 +23,8 @@ export class CoursesService {
     private readonly teachingAssignmentRepository: Repository<TeachingAssignment>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(ClassTransferHistory)
+    private readonly classTransferHistoryRepository: Repository<ClassTransferHistory>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -407,6 +410,193 @@ export class CoursesService {
         status: enr.status,
         enrolledAt: enr.enrolledAt,
         completedPercent: enr.completedPercent,
+      })),
+    };
+  }
+
+  // ==================== CLASS TRANSFER & HISTORY ====================
+
+  async transferStudent(dto: TransferStudentDto, adminId: string) {
+    return await this.dataSource.transaction(async (manager) => {
+      // 1. Validate student existence and role
+      const student = await manager.findOne(User, {
+        where: { id: dto.studentId, role: UserRole.STUDENT },
+      });
+      if (!student) {
+        throw new BadRequestException('ID người dùng không phải là Học viên hoặc không tồn tại');
+      }
+
+      if (student.status === UserStatus.LOCKED) {
+        throw new BadRequestException('Tài khoản học viên này hiện đang bị khóa');
+      }
+
+      // 2. Validate fromClass and toClass existence
+      const fromClass = await manager.findOne(Class, {
+        where: { id: dto.fromClassId },
+      });
+      if (!fromClass) {
+        throw new NotFoundException('Không tìm thấy lớp học nguồn');
+      }
+
+      const toClass = await manager.findOne(Class, {
+        where: { id: dto.toClassId },
+      });
+      if (!toClass) {
+        throw new NotFoundException('Không tìm thấy lớp học đích');
+      }
+
+      // 3. Ensure both classes belong to the same course
+      if (fromClass.courseId !== toClass.courseId) {
+        throw new BadRequestException('Hai lớp học này không thuộc cùng một khóa học');
+      }
+
+      if (dto.fromClassId === dto.toClassId) {
+        throw new BadRequestException('Lớp học nguồn và lớp học đích không được trùng nhau');
+      }
+
+      // 4. Validate current active enrollment in fromClass
+      const currentEnrollment = await manager.findOne(Enrollment, {
+        where: {
+          studentId: dto.studentId,
+          courseId: fromClass.courseId,
+          classId: dto.fromClassId,
+          status: EnrollmentStatus.ACTIVE,
+        },
+      });
+
+      if (!currentEnrollment) {
+        throw new BadRequestException('Học viên không có thông tin ghi danh hoạt động ở lớp học nguồn');
+      }
+
+      // 5. Check if student already has an active enrollment in toClass
+      const targetActiveEnrollment = await manager.findOne(Enrollment, {
+        where: {
+          studentId: dto.studentId,
+          courseId: fromClass.courseId,
+          classId: dto.toClassId,
+          status: EnrollmentStatus.ACTIVE,
+        },
+      });
+      if (targetActiveEnrollment) {
+        throw new BadRequestException('Học viên đã hoạt động trong lớp học đích rồi');
+      }
+
+      // 6. Check capacity of toClass
+      if (toClass.maxStudents !== null && toClass.maxStudents !== undefined) {
+        const currentActiveCount = await manager.count(Enrollment, {
+          where: { classId: dto.toClassId, status: EnrollmentStatus.ACTIVE },
+        });
+
+        if (currentActiveCount >= toClass.maxStudents) {
+          throw new BadRequestException('Lớp học đích đã đạt sĩ số tối đa, không thể điều chuyển thêm học viên');
+        }
+      }
+
+      // 7. Update old enrollment to TRANSFERRED
+      currentEnrollment.status = EnrollmentStatus.TRANSFERRED;
+      await manager.save(Enrollment, currentEnrollment);
+
+      // 8. Create or update new enrollment to ACTIVE, copy completedPercent
+      let newEnrollment = await manager.findOne(Enrollment, {
+        where: {
+          studentId: dto.studentId,
+          courseId: fromClass.courseId,
+          classId: dto.toClassId,
+        },
+      });
+
+      if (newEnrollment) {
+        newEnrollment.status = EnrollmentStatus.ACTIVE;
+        newEnrollment.enrolledAt = new Date();
+        newEnrollment.completedPercent = currentEnrollment.completedPercent;
+      } else {
+        newEnrollment = manager.create(Enrollment, {
+          studentId: dto.studentId,
+          courseId: fromClass.courseId,
+          classId: dto.toClassId,
+          status: EnrollmentStatus.ACTIVE,
+          completedPercent: currentEnrollment.completedPercent,
+        });
+      }
+      await manager.save(Enrollment, newEnrollment);
+
+      // 9. Save transfer history
+      const history = manager.create(ClassTransferHistory, {
+        studentId: dto.studentId,
+        courseId: fromClass.courseId,
+        fromClassId: dto.fromClassId,
+        toClassId: dto.toClassId,
+        reason: dto.reason || null,
+        transferredBy: adminId,
+      });
+      await manager.save(ClassTransferHistory, history);
+
+      return {
+        success: true,
+        message: 'Điều chuyển lớp học viên thành công',
+        data: history,
+      };
+    });
+  }
+
+  async findTransferHistories(query: {
+    studentId?: string;
+    courseId?: string;
+    fromClassId?: string;
+    toClassId?: string;
+  }) {
+    const qb = this.classTransferHistoryRepository
+      .createQueryBuilder('history')
+      .leftJoinAndSelect('history.student', 'student')
+      .leftJoinAndSelect('history.course', 'course')
+      .leftJoinAndSelect('history.fromClass', 'fromClass')
+      .leftJoinAndSelect('history.toClass', 'toClass')
+      .leftJoinAndSelect('history.transferredByUser', 'admin');
+
+    if (query.studentId) {
+      qb.andWhere('history.studentId = :studentId', { studentId: query.studentId });
+    }
+    if (query.courseId) {
+      qb.andWhere('history.courseId = :courseId', { courseId: query.courseId });
+    }
+    if (query.fromClassId) {
+      qb.andWhere('history.fromClassId = :fromClassId', { fromClassId: query.fromClassId });
+    }
+    if (query.toClassId) {
+      qb.andWhere('history.toClassId = :toClassId', { toClassId: query.toClassId });
+    }
+
+    qb.orderBy('history.transferredAt', 'DESC');
+    const list = await qb.getMany();
+
+    return {
+      success: true,
+      data: list.map((item) => ({
+        id: item.id,
+        student: {
+          id: item.student?.id,
+          fullName: item.student?.fullName,
+          email: item.student?.email,
+        },
+        course: {
+          id: item.course?.id,
+          code: item.course?.code,
+          name: item.course?.name,
+        },
+        fromClass: {
+          id: item.fromClass?.id,
+          name: item.fromClass?.name,
+        },
+        toClass: {
+          id: item.toClass?.id,
+          name: item.toClass?.name,
+        },
+        reason: item.reason,
+        transferredBy: {
+          id: item.transferredByUser?.id,
+          fullName: item.transferredByUser?.fullName,
+        },
+        transferredAt: item.transferredAt,
       })),
     };
   }

@@ -4,6 +4,7 @@ import { Course } from '../models/Course.entity';
 import { Class } from '../models/Class.entity';
 import { Enrollment } from '../models/Enrollment.entity';
 import { TeachingAssignment } from '../models/TeachingAssignment.entity';
+import { ClassTransferHistory } from '../models/ClassTransferHistory.entity';
 import { User } from '../../users/models/User.entity';
 import { CoursesController } from '../controllers/courses.controller';
 import { CoursesService } from '../services/courses.service';
@@ -15,6 +16,7 @@ import { CoursesService } from '../services/courses.service';
       Class,
       Enrollment,
       TeachingAssignment,
+      ClassTransferHistory,
       User,
     ]),
   ],
