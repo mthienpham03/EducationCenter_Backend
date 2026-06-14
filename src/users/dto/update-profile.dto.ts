@@ -61,6 +61,16 @@ export class UpdateProfileDto {
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
+  degree?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  skills?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
   bio?: string;
 
   @ApiProperty({ required: false, type: [CertificateDto] })
@@ -80,4 +90,19 @@ export class UpdateProfileDto {
   @IsString()
   @IsOptional()
   address?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  school?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  major?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  learningGoal?: string;
 }
