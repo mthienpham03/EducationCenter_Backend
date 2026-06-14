@@ -415,7 +415,7 @@ export class UsersService {
   }
 
   async updateLecturer(id: string, updateLecturerDto: UpdateLecturerDto) {
-    const { email, fullName, phone, specializationIds, experienceYears } =
+    const { email, fullName, phone, specializationIds, experienceYears, degree, skills, bio } =
       updateLecturerDto;
 
     const queryRunner = this.dataSource.createQueryRunner();
@@ -459,6 +459,9 @@ export class UsersService {
       }
 
       if (experienceYears !== undefined) profile.experienceYears = experienceYears;
+      if (degree !== undefined) profile.degree = degree;
+      if (skills !== undefined) profile.skills = skills;
+      if (bio !== undefined) profile.bio = bio;
 
       if (specializationIds !== undefined) {
         let specializations: Specialization[] = [];
@@ -500,7 +503,7 @@ export class UsersService {
   }
 
   async updateStudent(id: string, updateStudentDto: UpdateStudentDto) {
-    const { email, fullName, phone, studentCode, dateOfBirth, address } =
+    const { email, fullName, phone, studentCode, dateOfBirth, address, school, major, learningGoal, bio } =
       updateStudentDto;
 
     const queryRunner = this.dataSource.createQueryRunner();
@@ -559,6 +562,18 @@ export class UsersService {
       }
       if (address !== undefined) {
         profile.address = address;
+      }
+      if (school !== undefined) {
+        profile.school = school;
+      }
+      if (major !== undefined) {
+        profile.major = major;
+      }
+      if (learningGoal !== undefined) {
+        profile.learningGoal = learningGoal;
+      }
+      if (bio !== undefined) {
+        profile.bio = bio;
       }
 
       await studentProfileRepository.save(profile);
@@ -916,6 +931,12 @@ export class UsersService {
         if (updateDto.experienceYears !== undefined) {
           profile.experienceYears = updateDto.experienceYears;
         }
+        if (updateDto.degree !== undefined) {
+          profile.degree = updateDto.degree;
+        }
+        if (updateDto.skills !== undefined) {
+          profile.skills = updateDto.skills;
+        }
         if (updateDto.bio !== undefined) {
           profile.bio = updateDto.bio;
         }
@@ -963,6 +984,18 @@ export class UsersService {
         }
         if (updateDto.address !== undefined) {
           profile.address = updateDto.address;
+        }
+        if (updateDto.school !== undefined) {
+          profile.school = updateDto.school;
+        }
+        if (updateDto.major !== undefined) {
+          profile.major = updateDto.major;
+        }
+        if (updateDto.learningGoal !== undefined) {
+          profile.learningGoal = updateDto.learningGoal;
+        }
+        if (updateDto.bio !== undefined) {
+          profile.bio = updateDto.bio;
         }
 
         await studentProfileRepository.save(profile);

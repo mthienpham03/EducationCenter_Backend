@@ -27,6 +27,18 @@ export class StudentProfile {
   @Column({ type: 'text', nullable: true })
   address: string | null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  school: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  major: string | null;
+
+  @Column({ name: 'learning_goal', type: 'text', nullable: true })
+  learningGoal: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  bio: string | null;
+
   @Column({ type: 'text', nullable: true })
   note: string | null;
 

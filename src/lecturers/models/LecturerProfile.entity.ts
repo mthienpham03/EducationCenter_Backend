@@ -32,6 +32,12 @@ export class LecturerProfile {
   @Column({ name: 'experience_years', type: 'int', nullable: true })
   experienceYears: number | null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  degree: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  skills: string | null;
+
   @Column({ type: 'text', nullable: true })
   bio: string | null;
 

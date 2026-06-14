@@ -39,6 +39,21 @@ export class UpdateLecturerDto {
   @IsInt()
   @Min(0)
   experienceYears?: number;
+
+  @ApiPropertyOptional({ description: 'Học vị' })
+  @IsOptional()
+  @IsString()
+  degree?: string;
+
+  @ApiPropertyOptional({ description: 'Kỹ năng chuyên môn' })
+  @IsOptional()
+  @IsString()
+  skills?: string;
+
+  @ApiPropertyOptional({ description: 'Giới thiệu bản thân' })
+  @IsOptional()
+  @IsString()
+  bio?: string;
 }
 
 export class UpdateStudentDto {
@@ -74,4 +89,24 @@ export class UpdateStudentDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @ApiPropertyOptional({ description: 'Trường học' })
+  @IsOptional()
+  @IsString()
+  school?: string;
+
+  @ApiPropertyOptional({ description: 'Chuyên ngành' })
+  @IsOptional()
+  @IsString()
+  major?: string;
+
+  @ApiPropertyOptional({ description: 'Mục tiêu học tập' })
+  @IsOptional()
+  @IsString()
+  learningGoal?: string;
+
+  @ApiPropertyOptional({ description: 'Giới thiệu bản thân' })
+  @IsOptional()
+  @IsString()
+  bio?: string;
 }
