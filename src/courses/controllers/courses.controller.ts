@@ -44,12 +44,16 @@ export class CoursesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Lấy danh sách khóa học (Có tìm kiếm & lọc trạng thái)' })
+  @ApiOperation({ summary: 'Lấy danh sách khóa học (Có tìm kiếm & lọc trạng thái theo vai trò)' })
   @ApiQuery({ name: 'search', required: false, description: 'Tìm kiếm theo tên hoặc mã khóa học' })
   @ApiQuery({ name: 'status', required: false, description: 'Trạng thái khóa học (draft / published / archived)' })
   @ApiResponse({ status: 200, description: 'Lấy danh sách khóa học thành công' })
-  async findAllCourses(@Query('search') search?: string, @Query('status') status?: string) {
-    return this.coursesService.findAllCourses(search, status);
+  async findAllCourses(
+    @Req() req,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.coursesService.findAllCourses(req.user.id, req.user.role, search, status);
   }
 
   @Get(':id')

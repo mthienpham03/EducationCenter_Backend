@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { Course } from '../models/Course.entity';
+import { Course, CourseStatus } from '../models/Course.entity';
 import { Class } from '../models/Class.entity';
 import { Enrollment, EnrollmentStatus } from '../models/Enrollment.entity';
 import { TeachingAssignment } from '../models/TeachingAssignment.entity';
@@ -51,8 +51,26 @@ export class CoursesService {
     };
   }
 
-  async findAllCourses(search?: string, status?: string) {
+  async findAllCourses(userId: string, role: string, search?: string, status?: string) {
     const query = this.courseRepository.createQueryBuilder('course');
+
+    if (role === UserRole.LECTURER) {
+      query.andWhere(
+        `EXISTS (
+          SELECT 1 FROM teaching_assignments assignment 
+          WHERE assignment.course_id = course.id AND assignment.lecturer_id = :userId
+        )`,
+        { userId },
+      );
+    } else if (role === UserRole.STUDENT) {
+      query.andWhere(
+        `EXISTS (
+          SELECT 1 FROM enrollments enrollment 
+          WHERE enrollment.course_id = course.id AND enrollment.student_id = :userId AND enrollment.status = :enrollmentStatus
+        )`,
+        { userId, enrollmentStatus: EnrollmentStatus.ACTIVE },
+      );
+    }
 
     if (search) {
       query.andWhere(
@@ -63,6 +81,8 @@ export class CoursesService {
 
     if (status) {
       query.andWhere('course.status = :status', { status });
+    } else if (role === UserRole.STUDENT) {
+      query.andWhere('course.status = :status', { status: CourseStatus.PUBLISHED });
     }
 
     query.orderBy('course.createdAt', 'DESC');
