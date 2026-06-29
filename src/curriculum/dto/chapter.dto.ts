@@ -10,26 +10,38 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateChapterDto {
-  @ApiProperty({ description: 'Tiêu đề chương học', example: 'Chương 1: Giới thiệu' })
+  @ApiProperty({
+    description: 'Tiêu đề chương học',
+    example: 'Chương 1: Giới thiệu',
+  })
   @IsString()
   @IsNotEmpty({ message: 'Tiêu đề chương học không được để trống' })
   @MaxLength(255)
   title: string;
 
-  @ApiPropertyOptional({ description: 'Mô tả chi tiết chương học', example: 'Chương này giới thiệu các khái niệm cơ bản' })
+  @ApiPropertyOptional({
+    description: 'Mô tả chi tiết chương học',
+    example: 'Chương này giới thiệu các khái niệm cơ bản',
+  })
   @IsOptional()
   @IsString()
   description?: string;
 }
 
 export class UpdateChapterDto {
-  @ApiPropertyOptional({ description: 'Tiêu đề chương học', example: 'Chương 1: Giới thiệu (Cập nhật)' })
+  @ApiPropertyOptional({
+    description: 'Tiêu đề chương học',
+    example: 'Chương 1: Giới thiệu (Cập nhật)',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(255)
   title?: string;
 
-  @ApiPropertyOptional({ description: 'Mô tả chi tiết chương học', example: 'Mô tả cập nhật' })
+  @ApiPropertyOptional({
+    description: 'Mô tả chi tiết chương học',
+    example: 'Mô tả cập nhật',
+  })
   @IsOptional()
   @IsString()
   description?: string;

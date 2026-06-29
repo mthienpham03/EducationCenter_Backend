@@ -127,12 +127,7 @@ export class DocumentsController {
     @Body() dto: AddVersionDto,
     @Req() req: RequestWithUser,
   ) {
-    return this.documentsService.addVersion(
-      id,
-      file,
-      dto,
-      req.user
-    );
+    return this.documentsService.addVersion(id, file, dto, req.user);
   }
 
   @Get()
@@ -176,7 +171,7 @@ export class DocumentsController {
   ) {
     return this.documentsService.findAll(
       { search, status, visibility, lessonId, chapterId, courseId },
-      req.user
+      req.user,
     );
   }
 

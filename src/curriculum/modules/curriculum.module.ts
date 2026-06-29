@@ -7,9 +7,7 @@ import { CurriculumController } from '../controllers/curriculum.controller';
 import { CurriculumService } from '../services/curriculum.service';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([CurriculumChapter, Lesson, Course]),
-  ],
+  imports: [TypeOrmModule.forFeature([CurriculumChapter, Lesson, Course])],
   controllers: [CurriculumController],
   providers: [CurriculumService],
   exports: [CurriculumService],

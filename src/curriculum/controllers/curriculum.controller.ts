@@ -21,8 +21,16 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../users/models/User.entity';
 import { CurriculumService } from '../services/curriculum.service';
-import { CreateChapterDto, UpdateChapterDto, ReorderChaptersDto } from '../dto/chapter.dto';
-import { CreateLessonDto, UpdateLessonDto, ReorderLessonsDto } from '../dto/lesson.dto';
+import {
+  CreateChapterDto,
+  UpdateChapterDto,
+  ReorderChaptersDto,
+} from '../dto/chapter.dto';
+import {
+  CreateLessonDto,
+  UpdateLessonDto,
+  ReorderLessonsDto,
+} from '../dto/lesson.dto';
 
 @ApiTags('Curriculum Management')
 @ApiBearerAuth()
@@ -48,9 +56,15 @@ export class CurriculumController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Lấy danh sách chương học của khóa học (kèm bài học, sắp xếp theo vị trí)' })
+  @ApiOperation({
+    summary:
+      'Lấy danh sách chương học của khóa học (kèm bài học, sắp xếp theo vị trí)',
+  })
   @ApiParam({ name: 'courseId', description: 'ID khóa học' })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách chương học thành công' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách chương học thành công',
+  })
   async findChaptersByCourse(@Param('courseId') courseId: string) {
     return this.curriculumService.findChaptersByCourse(courseId);
   }
@@ -59,9 +73,14 @@ export class CurriculumController {
   @Patch('reorder')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Admin sắp xếp lại vị trí các chương học trong khóa học' })
+  @ApiOperation({
+    summary: 'Admin sắp xếp lại vị trí các chương học trong khóa học',
+  })
   @ApiParam({ name: 'courseId', description: 'ID khóa học' })
-  @ApiResponse({ status: 200, description: 'Sắp xếp lại chương học thành công' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sắp xếp lại chương học thành công',
+  })
   async reorderChapters(
     @Param('courseId') courseId: string,
     @Body() dto: ReorderChaptersDto,
@@ -70,10 +89,15 @@ export class CurriculumController {
   }
 
   @Get(':chapterId')
-  @ApiOperation({ summary: 'Lấy chi tiết một chương học (kèm danh sách bài học)' })
+  @ApiOperation({
+    summary: 'Lấy chi tiết một chương học (kèm danh sách bài học)',
+  })
   @ApiParam({ name: 'courseId', description: 'ID khóa học' })
   @ApiParam({ name: 'chapterId', description: 'ID chương học' })
-  @ApiResponse({ status: 200, description: 'Lấy chi tiết chương học thành công' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy chi tiết chương học thành công',
+  })
   async findChapterById(
     @Param('courseId') courseId: string,
     @Param('chapterId') chapterId: string,
@@ -94,13 +118,21 @@ export class CurriculumController {
     @Param('chapterId') chapterId: string,
     @Body() dto: UpdateChapterDto,
   ) {
-    return this.curriculumService.updateChapter(courseId, chapterId, dto, req.user.id);
+    return this.curriculumService.updateChapter(
+      courseId,
+      chapterId,
+      dto,
+      req.user.id,
+    );
   }
 
   @Delete(':chapterId')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Admin xóa (soft-delete) chương học (kèm xóa các bài học trong chương)' })
+  @ApiOperation({
+    summary:
+      'Admin xóa (soft-delete) chương học (kèm xóa các bài học trong chương)',
+  })
   @ApiParam({ name: 'courseId', description: 'ID khóa học' })
   @ApiParam({ name: 'chapterId', description: 'ID chương học' })
   @ApiResponse({ status: 200, description: 'Xóa chương học thành công' })
@@ -126,11 +158,18 @@ export class CurriculumController {
     @Param('chapterId') chapterId: string,
     @Body() dto: CreateLessonDto,
   ) {
-    return this.curriculumService.createLesson(courseId, chapterId, dto, req.user.id);
+    return this.curriculumService.createLesson(
+      courseId,
+      chapterId,
+      dto,
+      req.user.id,
+    );
   }
 
   @Get(':chapterId/lessons')
-  @ApiOperation({ summary: 'Lấy danh sách bài học trong chương (sắp xếp theo vị trí)' })
+  @ApiOperation({
+    summary: 'Lấy danh sách bài học trong chương (sắp xếp theo vị trí)',
+  })
   @ApiParam({ name: 'courseId', description: 'ID khóa học' })
   @ApiParam({ name: 'chapterId', description: 'ID chương học' })
   @ApiResponse({ status: 200, description: 'Lấy danh sách bài học thành công' })
@@ -145,7 +184,9 @@ export class CurriculumController {
   @Patch(':chapterId/lessons/reorder')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Admin sắp xếp lại vị trí các bài học trong chương' })
+  @ApiOperation({
+    summary: 'Admin sắp xếp lại vị trí các bài học trong chương',
+  })
   @ApiParam({ name: 'courseId', description: 'ID khóa học' })
   @ApiParam({ name: 'chapterId', description: 'ID chương học' })
   @ApiResponse({ status: 200, description: 'Sắp xếp lại bài học thành công' })
@@ -154,7 +195,11 @@ export class CurriculumController {
     @Param('chapterId') chapterId: string,
     @Body() dto: ReorderLessonsDto,
   ) {
-    return this.curriculumService.reorderLessons(courseId, chapterId, dto.orderedIds);
+    return this.curriculumService.reorderLessons(
+      courseId,
+      chapterId,
+      dto.orderedIds,
+    );
   }
 
   @Get(':chapterId/lessons/:lessonId')
@@ -186,7 +231,13 @@ export class CurriculumController {
     @Param('lessonId') lessonId: string,
     @Body() dto: UpdateLessonDto,
   ) {
-    return this.curriculumService.updateLesson(courseId, chapterId, lessonId, dto, req.user.id);
+    return this.curriculumService.updateLesson(
+      courseId,
+      chapterId,
+      lessonId,
+      dto,
+      req.user.id,
+    );
   }
 
   @Delete(':chapterId/lessons/:lessonId')

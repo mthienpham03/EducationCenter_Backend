@@ -9,10 +9,7 @@ import { CurriculumChapter } from '../models/CurriculumChapter.entity';
 import { Lesson } from '../models/Lesson.entity';
 import { Course } from '../../courses/models/Course.entity';
 import { CreateChapterDto, UpdateChapterDto } from '../dto/chapter.dto';
-import {
-  CreateLessonDto,
-  UpdateLessonDto,
-} from '../dto/lesson.dto';
+import { CreateLessonDto, UpdateLessonDto } from '../dto/lesson.dto';
 
 @Injectable()
 export class CurriculumService {
@@ -29,7 +26,8 @@ export class CurriculumService {
   // ==================== HELPER ====================
 
   private async findCourseOrFail(courseId: string): Promise<Course> {
-    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const UUID_REGEX =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!UUID_REGEX.test(courseId)) {
       throw new BadRequestException('ID khóa học không đúng định dạng UUID');
     }
@@ -46,7 +44,8 @@ export class CurriculumService {
     chapterId: string,
     courseId: string,
   ): Promise<CurriculumChapter> {
-    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const UUID_REGEX =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!UUID_REGEX.test(chapterId)) {
       throw new BadRequestException('ID chương học không đúng định dạng UUID');
     }
@@ -65,7 +64,8 @@ export class CurriculumService {
     lessonId: string,
     chapterId: string,
   ): Promise<Lesson> {
-    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const UUID_REGEX =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!UUID_REGEX.test(lessonId)) {
       throw new BadRequestException('ID bài học không đúng định dạng UUID');
     }
@@ -73,9 +73,7 @@ export class CurriculumService {
       where: { id: lessonId, chapterId },
     });
     if (!lesson) {
-      throw new NotFoundException(
-        'Không tìm thấy bài học trong chương này',
-      );
+      throw new NotFoundException('Không tìm thấy bài học trong chương này');
     }
     return lesson;
   }
@@ -294,11 +292,7 @@ export class CurriculumService {
     };
   }
 
-  async findLessonById(
-    courseId: string,
-    chapterId: string,
-    lessonId: string,
-  ) {
+  async findLessonById(courseId: string, chapterId: string, lessonId: string) {
     await this.findCourseOrFail(courseId);
     await this.findChapterOrFail(chapterId, courseId);
     const lesson = await this.findLessonOrFail(lessonId, chapterId);
@@ -333,11 +327,7 @@ export class CurriculumService {
     };
   }
 
-  async removeLesson(
-    courseId: string,
-    chapterId: string,
-    lessonId: string,
-  ) {
+  async removeLesson(courseId: string, chapterId: string, lessonId: string) {
     await this.findCourseOrFail(courseId);
     await this.findChapterOrFail(chapterId, courseId);
     const lesson = await this.findLessonOrFail(lessonId, chapterId);

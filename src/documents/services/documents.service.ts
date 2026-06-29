@@ -10,7 +10,10 @@ import { Document, DocumentStatus } from '../models/Document.entity';
 import { DocumentVersion } from '../models/DocumentVersion.entity';
 import { Lesson } from '../../curriculum/models/Lesson.entity';
 import { CurriculumChapter } from '../../curriculum/models/CurriculumChapter.entity';
-import { Enrollment, EnrollmentStatus } from '../../courses/models/Enrollment.entity';
+import {
+  Enrollment,
+  EnrollmentStatus,
+} from '../../courses/models/Enrollment.entity';
 import { TeachingAssignment } from '../../courses/models/TeachingAssignment.entity';
 import { CloudinaryService } from '../../utils/cloudinary/services/cloudinary.service';
 import { UserRole } from '../../users/models/User.entity';
@@ -69,7 +72,7 @@ export class DocumentsService {
    */
   private async checkDocumentAccess(
     document: Document,
-    user: { id: string; role: string },
+    user: { id: string; role: UserRole },
     requireWrite = false,
   ): Promise<void> {
     // Admin: toàn quyền
@@ -80,7 +83,7 @@ export class DocumentsService {
     // Nếu document không gắn lesson → chỉ admin truy cập được
     if (!document.lessonId) {
       if (requireWrite && document.ownerId === user.id) {
-          return;
+        return;
       }
       throw new ForbiddenException('Bạn không có quyền truy cập tài liệu này');
     }
@@ -111,7 +114,9 @@ export class DocumentsService {
     if (user.role === UserRole.STUDENT) {
       // Student: không có quyền write
       if (requireWrite) {
-        throw new ForbiddenException('Học viên không có quyền chỉnh sửa tài liệu');
+        throw new ForbiddenException(
+          'Học viên không có quyền chỉnh sửa tài liệu',
+        );
       }
 
       // Document phải là published
@@ -167,7 +172,7 @@ export class DocumentsService {
     if (
       mimetype === 'application/vnd.ms-powerpoint' ||
       mimetype ===
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
       filename.endsWith('.ppt') ||
       filename.endsWith('.pptx')
     ) {
@@ -214,7 +219,7 @@ export class DocumentsService {
   async uploadDocument(
     file: Express.Multer.File,
     dto: CreateDocumentDto,
-    user: { id: string; role: string },
+    user: { id: string; role: UserRole },
   ) {
     if (!file) {
       throw new BadRequestException('Vui lòng chọn tệp tin cần tải lên');
@@ -264,19 +269,25 @@ export class DocumentsService {
         resourceType = 'video';
       }
 
-      const fileExtension = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase();
+      const fileExtension = file.originalname
+        .substring(file.originalname.lastIndexOf('.'))
+        .toLowerCase();
       const uniqueFilename = `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-      const publicId = resourceType === 'raw' ? `${uniqueFilename}${fileExtension}` : uniqueFilename;
-      
+      const publicId =
+        resourceType === 'raw'
+          ? `${uniqueFilename}${fileExtension}`
+          : uniqueFilename;
+
       uploadResult = await this.cloudinaryService.uploadFile(file, {
         resource_type: resourceType,
         folder: `educenter/documents/${courseId}/${dto.lessonId || 'no-lesson'}`,
         public_id: publicId,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Lỗi khi tải file lên Cloudinary:', error);
+      const msg = error instanceof Error ? error.message : String(error);
       throw new BadRequestException(
-        `Không thể tải file lên hệ thống lưu trữ Cloudinary: ${error?.message || error || ''}`,
+        `Không thể tải file lên hệ thống lưu trữ Cloudinary: ${msg}`,
       );
     }
 
@@ -315,7 +326,7 @@ export class DocumentsService {
         data: {
           ...savedDoc,
           versions: [documentVersion],
-        }
+        },
       };
     });
   }
@@ -329,7 +340,7 @@ export class DocumentsService {
       chapterId?: string;
       courseId?: string;
     },
-    user: { id: string; role: string },
+    user: { id: string; role: UserRole },
   ) {
     const qb = this.documentRepository
       .createQueryBuilder('doc')
@@ -360,7 +371,9 @@ export class DocumentsService {
       qb.andWhere('doc.status = :status', { status: query.status });
     }
     if (query.visibility) {
-      qb.andWhere('doc.visibility = :visibility', { visibility: query.visibility });
+      qb.andWhere('doc.visibility = :visibility', {
+        visibility: query.visibility,
+      });
     }
 
     // Role-based filtering
@@ -411,7 +424,7 @@ export class DocumentsService {
     };
   }
 
-  async findOne(id: string, user: { id: string; role: string }) {
+  async findOne(id: string, user: { id: string; role: UserRole }) {
     if (!UUID_REGEX.test(id)) {
       throw new BadRequestException('ID tài liệu không đúng định dạng UUID');
     }
@@ -437,7 +450,7 @@ export class DocumentsService {
   async update(
     id: string,
     dto: UpdateDocumentDto,
-    user: { id: string; role: string },
+    user: { id: string; role: UserRole },
   ) {
     if (!UUID_REGEX.test(id)) {
       throw new BadRequestException('ID tài liệu không đúng định dạng UUID');
@@ -463,7 +476,7 @@ export class DocumentsService {
     };
   }
 
-  async remove(id: string, user: { id: string; role: string }) {
+  async remove(id: string, user: { id: string; role: UserRole }) {
     if (!UUID_REGEX.test(id)) {
       throw new BadRequestException('ID tài liệu không đúng định dạng UUID');
     }
@@ -486,7 +499,7 @@ export class DocumentsService {
     documentId: string,
     file: Express.Multer.File,
     dto: AddVersionDto,
-    user: { id: string; role: string },
+    user: { id: string; role: UserRole },
   ) {
     if (!file) {
       throw new BadRequestException(
@@ -536,19 +549,25 @@ export class DocumentsService {
         resourceType = 'video';
       }
 
-      const fileExtension = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase();
+      const fileExtension = file.originalname
+        .substring(file.originalname.lastIndexOf('.'))
+        .toLowerCase();
       const uniqueFilename = `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-      const publicId = resourceType === 'raw' ? `${uniqueFilename}${fileExtension}` : uniqueFilename;
+      const publicId =
+        resourceType === 'raw'
+          ? `${uniqueFilename}${fileExtension}`
+          : uniqueFilename;
 
       uploadResult = await this.cloudinaryService.uploadFile(file, {
         resource_type: resourceType,
         folder: `educenter/documents/${courseId}/${document.lessonId || 'no-lesson'}`,
         public_id: publicId,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Lỗi khi tải file lên Cloudinary:', error);
+      const msg = error instanceof Error ? error.message : String(error);
       throw new BadRequestException(
-        `Không thể tải file lên hệ thống lưu trữ Cloudinary: ${error?.message || error || ''}`,
+        `Không thể tải file lên hệ thống lưu trữ Cloudinary: ${msg}`,
       );
     }
 

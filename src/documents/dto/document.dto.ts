@@ -24,12 +24,18 @@ export enum DocumentVisibility {
 }
 
 export class UploadDocumentDto {
-  @ApiProperty({ description: 'ID bài học gắn tài liệu', example: 'uuid-lesson' })
+  @ApiProperty({
+    description: 'ID bài học gắn tài liệu',
+    example: 'uuid-lesson',
+  })
   @IsUUID('4', { message: 'lessonId phải là UUID hợp lệ' })
   @IsNotEmpty({ message: 'ID bài học không được để trống' })
   lessonId: string;
 
-  @ApiProperty({ description: 'Tiêu đề tài liệu', example: 'Slide bài giảng Chương 1' })
+  @ApiProperty({
+    description: 'Tiêu đề tài liệu',
+    example: 'Slide bài giảng Chương 1',
+  })
   @IsString()
   @IsNotEmpty({ message: 'Tiêu đề tài liệu không được để trống' })
   @MaxLength(255)
@@ -40,7 +46,9 @@ export class UploadDocumentDto {
     enum: DocumentType,
     example: DocumentType.PDF,
   })
-  @IsEnum(DocumentType, { message: 'Loại tài liệu không hợp lệ (pdf/doc/video/image/slide/other)' })
+  @IsEnum(DocumentType, {
+    message: 'Loại tài liệu không hợp lệ (pdf/doc/video/image/slide/other)',
+  })
   @IsNotEmpty()
   type: DocumentType;
 
@@ -50,7 +58,9 @@ export class UploadDocumentDto {
     default: DocumentVisibility.ENROLLED_ONLY,
   })
   @IsOptional()
-  @IsEnum(DocumentVisibility, { message: 'Giá trị visibility không hợp lệ (public/enrolled_only)' })
+  @IsEnum(DocumentVisibility, {
+    message: 'Giá trị visibility không hợp lệ (public/enrolled_only)',
+  })
   visibility?: DocumentVisibility;
 
   @ApiPropertyOptional({
@@ -64,7 +74,10 @@ export class UploadDocumentDto {
 }
 
 export class UpdateDocumentDto {
-  @ApiPropertyOptional({ description: 'Tiêu đề tài liệu', example: 'Slide bài giảng (Cập nhật)' })
+  @ApiPropertyOptional({
+    description: 'Tiêu đề tài liệu',
+    example: 'Slide bài giảng (Cập nhật)',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(255)
