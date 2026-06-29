@@ -14,6 +14,7 @@ import { MailModule } from './utils/mail/modules/mail.module';
 import { UsersModule } from './users/modules/users.module';
 import { SpecializationsModule } from './specializations/modules/specializations.module';
 import { CoursesModule } from './courses/modules/courses.module';
+import { CurriculumModule } from './curriculum/modules/curriculum.module';
 import { DocumentsModule } from './documents/modules/documents.module';
 
 @Module({
@@ -36,6 +37,7 @@ import { DocumentsModule } from './documents/modules/documents.module';
     UsersModule,
     SpecializationsModule,
     CoursesModule,
+    CurriculumModule,
     DocumentsModule,
   ],
   controllers: [AppController],

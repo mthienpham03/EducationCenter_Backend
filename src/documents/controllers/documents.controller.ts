@@ -92,7 +92,7 @@ export class DocumentsController {
     @Body() dto: CreateDocumentDto,
     @Req() req: RequestWithUser,
   ) {
-    return this.documentsService.uploadDocument(file, dto, req.user.id);
+    return this.documentsService.uploadDocument(file, dto, req.user);
   }
 
   @Post(':id/versions')
@@ -131,8 +131,7 @@ export class DocumentsController {
       id,
       file,
       dto,
-      req.user.id,
-      req.user.role,
+      req.user
     );
   }
 
@@ -172,11 +171,12 @@ export class DocumentsController {
     @Query('status') status?: string,
     @Query('visibility') visibility?: string,
     @Query('lessonId') lessonId?: string,
+    @Query('chapterId') chapterId?: string,
+    @Query('courseId') courseId?: string,
   ) {
     return this.documentsService.findAll(
-      { search, status, visibility, lessonId },
-      req.user.id,
-      req.user.role,
+      { search, status, visibility, lessonId, chapterId, courseId },
+      req.user
     );
   }
 
@@ -189,7 +189,7 @@ export class DocumentsController {
     description: 'Lấy thông tin tài liệu thành công',
   })
   async findOne(@Param('id') id: string, @Req() req: RequestWithUser) {
-    return this.documentsService.findOne(id, req.user.id, req.user.role);
+    return this.documentsService.findOne(id, req.user);
   }
 
   @Patch(':id')
@@ -202,7 +202,7 @@ export class DocumentsController {
     @Body() dto: UpdateDocumentDto,
     @Req() req: RequestWithUser,
   ) {
-    return this.documentsService.update(id, dto, req.user.id, req.user.role);
+    return this.documentsService.update(id, dto, req.user);
   }
 
   @Delete(':id')
@@ -211,6 +211,6 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Xóa tài liệu (soft-delete)' })
   @ApiResponse({ status: 200, description: 'Xóa tài liệu thành công' })
   async remove(@Param('id') id: string, @Req() req: RequestWithUser) {
-    return this.documentsService.remove(id, req.user.id, req.user.role);
+    return this.documentsService.remove(id, req.user);
   }
 }

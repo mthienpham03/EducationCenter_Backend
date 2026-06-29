@@ -8,12 +8,19 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Document, DocumentStatus } from '../models/Document.entity';
 import { DocumentVersion } from '../models/DocumentVersion.entity';
+import { Lesson } from '../../curriculum/models/Lesson.entity';
+import { CurriculumChapter } from '../../curriculum/models/CurriculumChapter.entity';
+import { Enrollment, EnrollmentStatus } from '../../courses/models/Enrollment.entity';
+import { TeachingAssignment } from '../../courses/models/TeachingAssignment.entity';
 import { CloudinaryService } from '../../utils/cloudinary/services/cloudinary.service';
+import { UserRole } from '../../users/models/User.entity';
 import { CreateDocumentDto } from '../dto/create-document.dto';
 import { UpdateDocumentDto } from '../dto/update-document.dto';
 import { AddVersionDto } from '../dto/add-version.dto';
-import { UserRole } from '../../users/models/User.entity';
 import { UploadApiResponse } from 'cloudinary';
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class DocumentsService {
@@ -22,9 +29,120 @@ export class DocumentsService {
     private readonly documentRepository: Repository<Document>,
     @InjectRepository(DocumentVersion)
     private readonly documentVersionRepository: Repository<DocumentVersion>,
+    @InjectRepository(Lesson)
+    private readonly lessonRepository: Repository<Lesson>,
+    @InjectRepository(CurriculumChapter)
+    private readonly chapterRepository: Repository<CurriculumChapter>,
+    @InjectRepository(Enrollment)
+    private readonly enrollmentRepository: Repository<Enrollment>,
+    @InjectRepository(TeachingAssignment)
+    private readonly teachingAssignmentRepository: Repository<TeachingAssignment>,
     private readonly cloudinaryService: CloudinaryService,
     private readonly dataSource: DataSource,
-  ) { }
+  ) {}
+
+  // ==================== PERMISSION HELPERS ====================
+
+  /**
+   * Lấy courseId từ một lesson (qua chapter)
+   */
+  private async getCourseIdFromLesson(lessonId: string): Promise<string> {
+    const lesson = await this.lessonRepository.findOne({
+      where: { id: lessonId },
+    });
+    if (!lesson) {
+      throw new NotFoundException('Không tìm thấy bài học');
+    }
+
+    const chapter = await this.chapterRepository.findOne({
+      where: { id: lesson.chapterId },
+    });
+    if (!chapter) {
+      throw new NotFoundException('Không tìm thấy chương học');
+    }
+
+    return chapter.courseId;
+  }
+
+  /**
+   * Kiểm tra quyền truy cập tài liệu theo role
+   */
+  private async checkDocumentAccess(
+    document: Document,
+    user: { id: string; role: string },
+    requireWrite = false,
+  ): Promise<void> {
+    // Admin: toàn quyền
+    if (user.role === UserRole.ADMIN) {
+      return;
+    }
+
+    // Nếu document không gắn lesson → chỉ admin truy cập được
+    if (!document.lessonId) {
+      if (requireWrite && document.ownerId === user.id) {
+          return;
+      }
+      throw new ForbiddenException('Bạn không có quyền truy cập tài liệu này');
+    }
+
+    const courseId = await this.getCourseIdFromLesson(document.lessonId);
+
+    if (user.role === UserRole.LECTURER) {
+      // Lecturer: phải có TeachingAssignment với course tương ứng
+      const assignment = await this.teachingAssignmentRepository.findOne({
+        where: { lecturerId: user.id, courseId },
+      });
+
+      if (!assignment) {
+        throw new ForbiddenException(
+          'Bạn không được phân công giảng dạy khóa học chứa tài liệu này',
+        );
+      }
+
+      // Nếu write, phải là owner
+      if (requireWrite && document.ownerId !== user.id) {
+        throw new ForbiddenException(
+          'Bạn chỉ có quyền chỉnh sửa tài liệu do chính mình tạo',
+        );
+      }
+      return;
+    }
+
+    if (user.role === UserRole.STUDENT) {
+      // Student: không có quyền write
+      if (requireWrite) {
+        throw new ForbiddenException('Học viên không có quyền chỉnh sửa tài liệu');
+      }
+
+      // Document phải là published
+      if (document.status !== DocumentStatus.PUBLISHED) {
+        throw new ForbiddenException('Tài liệu này chưa được xuất bản');
+      }
+
+      // Nếu visibility = public thì cho phép
+      if (document.visibility === 'public') {
+        return;
+      }
+
+      // Nếu restricted/enrolled_only: kiểm tra enrollment
+      const enrollment = await this.enrollmentRepository.findOne({
+        where: {
+          studentId: user.id,
+          courseId,
+          status: EnrollmentStatus.ACTIVE,
+        },
+      });
+
+      if (!enrollment) {
+        throw new ForbiddenException(
+          'Bạn chưa ghi danh vào khóa học chứa tài liệu này',
+        );
+      }
+      return;
+    }
+
+    throw new ForbiddenException('Bạn không có quyền truy cập tài liệu này');
+  }
 
   /**
    * Kiểm tra định dạng và dung lượng file, trả về loại tài liệu (PDF, PPT, Video)
@@ -93,16 +211,42 @@ export class DocumentsService {
     return originalname.substring(0, lastDotIndex);
   }
 
-  /**
-   * Tạo tài liệu mới và lưu phiên bản đầu tiên (version 1)
-   */
   async uploadDocument(
     file: Express.Multer.File,
     dto: CreateDocumentDto,
-    userId: string,
+    user: { id: string; role: string },
   ) {
     if (!file) {
       throw new BadRequestException('Vui lòng chọn tệp tin cần tải lên');
+    }
+
+    // Validate lessonId & permissions if lessonId is provided
+    let courseId = 'general';
+    if (dto.lessonId) {
+      if (!UUID_REGEX.test(dto.lessonId)) {
+        throw new BadRequestException('ID bài học không đúng định dạng UUID');
+      }
+
+      const lesson = await this.lessonRepository.findOne({
+        where: { id: dto.lessonId },
+      });
+      if (!lesson) {
+        throw new NotFoundException('Không tìm thấy bài học');
+      }
+
+      // Check write permission: phải là Admin hoặc Lecturer được phân công
+      courseId = await this.getCourseIdFromLesson(dto.lessonId);
+
+      if (user.role === UserRole.LECTURER) {
+        const assignment = await this.teachingAssignmentRepository.findOne({
+          where: { lecturerId: user.id, courseId },
+        });
+        if (!assignment) {
+          throw new ForbiddenException(
+            'Bạn không được phân công giảng dạy khóa học chứa bài học này',
+          );
+        }
+      }
     }
 
     // 1. Kiểm duyệt định dạng & dung lượng
@@ -122,11 +266,11 @@ export class DocumentsService {
 
       const fileExtension = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase();
       const uniqueFilename = `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-      // Video: Cloudinary tự append extension. raw (PDF/PPT): cần append thủ công.
       const publicId = resourceType === 'raw' ? `${uniqueFilename}${fileExtension}` : uniqueFilename;
+      
       uploadResult = await this.cloudinaryService.uploadFile(file, {
         resource_type: resourceType,
-        folder: `educenter/documents/${fileType.toLowerCase()}s`,
+        folder: `educenter/documents/${courseId}/${dto.lessonId || 'no-lesson'}`,
         public_id: publicId,
       });
     } catch (error: any) {
@@ -141,14 +285,14 @@ export class DocumentsService {
       // Tạo bản ghi Document
       const document = manager.create(Document, {
         lessonId: dto.lessonId || null,
-        ownerId: userId,
+        ownerId: user.id,
         title: title,
         type: fileType,
         fileUrl: uploadResult.secure_url,
         visibility: dto.visibility || 'restricted',
         status: dto.status || DocumentStatus.DRAFT,
-        createdBy: userId,
-        updatedBy: userId,
+        createdBy: user.id,
+        updatedBy: user.id,
       });
 
       const savedDoc = await manager.save(Document, document);
@@ -159,33 +303,199 @@ export class DocumentsService {
         versionNo: 1,
         fileUrl: uploadResult.secure_url,
         changeNote: 'Phiên bản khởi tạo đầu tiên',
-        createdBy: userId,
+        createdBy: user.id,
       });
 
       await manager.save(DocumentVersion, documentVersion);
 
       // Trả về đối tượng đầy đủ
       return {
-        ...savedDoc,
-        versions: [documentVersion],
+        success: true,
+        message: 'Upload tài liệu thành công',
+        data: {
+          ...savedDoc,
+          versions: [documentVersion],
+        }
       };
     });
   }
 
-  /**
-   * Tải lên một phiên bản mới (mới hơn) của tài liệu hiện có
-   */
+  async findAll(
+    query: {
+      search?: string;
+      status?: string;
+      visibility?: string;
+      lessonId?: string;
+      chapterId?: string;
+      courseId?: string;
+    },
+    user: { id: string; role: string },
+  ) {
+    const qb = this.documentRepository
+      .createQueryBuilder('doc')
+      .leftJoinAndSelect('doc.owner', 'owner')
+      .leftJoinAndSelect('doc.versions', 'versions')
+      .leftJoinAndSelect('doc.lesson', 'lesson')
+      .leftJoin('lesson.chapter', 'chapter');
+
+    // Lọc theo từ khóa tìm kiếm (tiêu đề tài liệu)
+    if (query.search) {
+      qb.andWhere('doc.title ILIKE :search', {
+        search: `%${query.search}%`,
+      });
+    }
+
+    // Lọc theo bài học, chương, khóa học
+    if (query.lessonId) {
+      qb.andWhere('doc.lessonId = :lessonId', { lessonId: query.lessonId });
+    }
+    if (query.chapterId) {
+      qb.andWhere('chapter.id = :chapterId', { chapterId: query.chapterId });
+    }
+    if (query.courseId) {
+      qb.andWhere('chapter.courseId = :courseId', { courseId: query.courseId });
+    }
+
+    if (query.status) {
+      qb.andWhere('doc.status = :status', { status: query.status });
+    }
+    if (query.visibility) {
+      qb.andWhere('doc.visibility = :visibility', { visibility: query.visibility });
+    }
+
+    // Role-based filtering
+    if (user.role === UserRole.STUDENT) {
+      // Students only see published documents
+      qb.andWhere('doc.status = :publishedStatus', {
+        publishedStatus: DocumentStatus.PUBLISHED,
+      });
+
+      // Only see docs belonging to courses they're enrolled in
+      // OR documents with visibility = 'public'
+      qb.andWhere(
+        `(
+          doc.visibility = 'public'
+          OR EXISTS (
+            SELECT 1 FROM enrollments e
+            WHERE e.student_id = :studentId
+              AND e.course_id = chapter.course_id
+              AND e.status = :activeStatus
+          )
+        )`,
+        {
+          studentId: user.id,
+          activeStatus: EnrollmentStatus.ACTIVE,
+        },
+      );
+    } else if (user.role === UserRole.LECTURER) {
+      // Lecturers see docs belonging to courses they teach, OR their own
+      qb.andWhere(
+        `(
+          doc.ownerId = :lecturerId
+          OR EXISTS (
+            SELECT 1 FROM teaching_assignments ta
+            WHERE ta.lecturer_id = :lecturerId
+              AND ta.course_id = chapter.course_id
+          )
+        )`,
+        { lecturerId: user.id },
+      );
+    }
+
+    qb.orderBy('doc.createdAt', 'DESC');
+    const documents = await qb.getMany();
+
+    return {
+      success: true,
+      data: documents,
+    };
+  }
+
+  async findOne(id: string, user: { id: string; role: string }) {
+    if (!UUID_REGEX.test(id)) {
+      throw new BadRequestException('ID tài liệu không đúng định dạng UUID');
+    }
+
+    const document = await this.documentRepository.findOne({
+      where: { id },
+      relations: { owner: true, versions: true, lesson: true },
+      order: { versions: { versionNo: 'DESC' } },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Không tìm thấy tài liệu');
+    }
+
+    await this.checkDocumentAccess(document, user);
+
+    return {
+      success: true,
+      data: document,
+    };
+  }
+
+  async update(
+    id: string,
+    dto: UpdateDocumentDto,
+    user: { id: string; role: string },
+  ) {
+    if (!UUID_REGEX.test(id)) {
+      throw new BadRequestException('ID tài liệu không đúng định dạng UUID');
+    }
+
+    const document = await this.documentRepository.findOne({ where: { id } });
+    if (!document) {
+      throw new NotFoundException('Không tìm thấy tài liệu cần cập nhật');
+    }
+
+    await this.checkDocumentAccess(document, user, true);
+
+    Object.assign(document, {
+      ...dto,
+      updatedBy: user.id,
+    });
+
+    const updated = await this.documentRepository.save(document);
+    return {
+      success: true,
+      message: 'Cập nhật thông tin tài liệu thành công',
+      data: updated,
+    };
+  }
+
+  async remove(id: string, user: { id: string; role: string }) {
+    if (!UUID_REGEX.test(id)) {
+      throw new BadRequestException('ID tài liệu không đúng định dạng UUID');
+    }
+
+    const document = await this.documentRepository.findOne({ where: { id } });
+    if (!document) {
+      throw new NotFoundException('Không tìm thấy tài liệu cần xóa');
+    }
+
+    await this.checkDocumentAccess(document, user, true);
+
+    await this.documentRepository.softRemove(document);
+    return {
+      success: true,
+      message: 'Xóa tài liệu thành công',
+    };
+  }
+
   async addVersion(
     documentId: string,
     file: Express.Multer.File,
     dto: AddVersionDto,
-    userId: string,
-    userRole: UserRole,
+    user: { id: string; role: string },
   ) {
     if (!file) {
       throw new BadRequestException(
         'Vui lòng chọn tệp tin phiên bản mới cần tải lên',
       );
+    }
+
+    if (!UUID_REGEX.test(documentId)) {
+      throw new BadRequestException('ID tài liệu không đúng định dạng UUID');
     }
 
     // 1. Tìm tài liệu cũ
@@ -198,12 +508,7 @@ export class DocumentsService {
       );
     }
 
-    // Kiểm soát quyền: Giảng viên chỉ được thêm phiên bản vào tài liệu của chính mình
-    if (userRole === UserRole.LECTURER && document.ownerId !== userId) {
-      throw new ForbiddenException(
-        'Bạn không có quyền cập nhật phiên bản cho tài liệu này',
-      );
-    }
+    await this.checkDocumentAccess(document, user, true);
 
     // 2. Kiểm duyệt định dạng & dung lượng
     const fileType = this.validateAndGetFileType(file);
@@ -213,7 +518,16 @@ export class DocumentsService {
       );
     }
 
-    // 3. Upload lên Cloudinary
+    // Upload file lên Cloudinary
+    let courseId = 'general';
+    if (document.lessonId) {
+      try {
+        courseId = await this.getCourseIdFromLesson(document.lessonId);
+      } catch {
+        // Fallback to 'general' if lesson/chapter not found
+      }
+    }
+
     let uploadResult: UploadApiResponse;
     try {
       // PDF -> raw (truy cập trực tiếp được), Video -> video, PPT -> raw
@@ -224,12 +538,11 @@ export class DocumentsService {
 
       const fileExtension = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase();
       const uniqueFilename = `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-      // Video: Cloudinary tự append extension. raw (PDF/PPT): cần append thủ công.
       const publicId = resourceType === 'raw' ? `${uniqueFilename}${fileExtension}` : uniqueFilename;
 
       uploadResult = await this.cloudinaryService.uploadFile(file, {
         resource_type: resourceType,
-        folder: `educenter/documents/${fileType.toLowerCase()}s`,
+        folder: `educenter/documents/${courseId}/${document.lessonId || 'no-lesson'}`,
         public_id: publicId,
       });
     } catch (error: any) {
@@ -255,14 +568,14 @@ export class DocumentsService {
         versionNo: nextVersionNo,
         fileUrl: uploadResult.secure_url,
         changeNote: dto.changeNote || `Cập nhật lên phiên bản ${nextVersionNo}`,
-        createdBy: userId,
+        createdBy: user.id,
       });
 
       const savedVersion = await manager.save(DocumentVersion, newVersion);
 
       // Cập nhật fileUrl mới nhất lên bản ghi chính
       document.fileUrl = uploadResult.secure_url;
-      document.updatedBy = userId;
+      document.updatedBy = user.id;
       await manager.save(Document, document);
 
       return {
@@ -271,201 +584,5 @@ export class DocumentsService {
         data: savedVersion,
       };
     });
-  }
-
-  /**
-   * Lấy danh sách tài liệu với phân quyền RBAC và các bộ lọc tìm kiếm
-   */
-  async findAll(
-    query: {
-      search?: string;
-      status?: string;
-      visibility?: string;
-      lessonId?: string;
-    },
-    userId: string,
-    userRole: UserRole,
-  ) {
-    const qb = this.documentRepository
-      .createQueryBuilder('document')
-      .leftJoinAndSelect('document.owner', 'owner')
-      .leftJoinAndSelect('document.versions', 'versions');
-
-    // Lọc theo từ khóa tìm kiếm (tiêu đề tài liệu)
-    if (query.search) {
-      qb.andWhere('document.title ILIKE :search', {
-        search: `%${query.search}%`,
-      });
-    }
-
-    // Lọc theo liên kết bài học
-    if (query.lessonId) {
-      qb.andWhere('document.lessonId = :lessonId', {
-        lessonId: query.lessonId,
-      });
-    }
-
-    // Áp dụng bộ lọc trạng thái và hiển thị dựa theo vai trò (RBAC Scoping)
-    if (userRole === UserRole.ADMIN) {
-      // Admin xem được tất cả
-      if (query.status) {
-        qb.andWhere('document.status = :status', { status: query.status });
-      }
-      if (query.visibility) {
-        qb.andWhere('document.visibility = :visibility', {
-          visibility: query.visibility,
-        });
-      }
-    } else if (userRole === UserRole.LECTURER) {
-      // Giảng viên xem được tài liệu của chính mình tải lên hoặc tài liệu ở chế độ public
-      qb.andWhere(
-        `(document.ownerId = :userId OR document.visibility = 'public')`,
-        { userId },
-      );
-
-      if (query.status) {
-        qb.andWhere('document.status = :status', { status: query.status });
-      }
-    } else if (userRole === UserRole.STUDENT) {
-      // Học viên chỉ được xem tài liệu đã xuất bản (published)
-      qb.andWhere('document.status = :publishedStatus', {
-        publishedStatus: DocumentStatus.PUBLISHED,
-      });
-
-      // Học viên chỉ xem tài liệu ở chế độ 'public' HOẶC 'restricted' có liên kết bài học mà học viên đã ghi danh
-      qb.andWhere(
-        `(document.visibility = 'public' OR 
-          (document.visibility = 'restricted' AND document.lessonId IS NOT NULL AND EXISTS (
-            SELECT 1 FROM enrollments enrollment
-            INNER JOIN lessons lesson ON lesson.id = document.lesson_id
-            INNER JOIN curriculum_chapters chapter ON chapter.id = lesson.chapter_id
-            WHERE enrollment.student_id = :userId AND enrollment.course_id = chapter.course_id AND enrollment.status = 'active'
-          ))
-         )`,
-        { userId },
-      );
-    }
-
-    qb.orderBy('document.createdAt', 'DESC');
-    const documents = await qb.getMany();
-
-    return {
-      success: true,
-      data: documents,
-    };
-  }
-
-  /**
-   * Xem chi tiết thông tin và lịch sử phiên bản của một tài liệu
-   */
-  async findOne(id: string, userId: string, userRole: UserRole) {
-    const document = await this.documentRepository.findOne({
-      where: { id },
-      relations: { owner: true, versions: true },
-      order: { versions: { versionNo: 'DESC' } },
-    });
-
-    if (!document) {
-      throw new NotFoundException('Không tìm thấy tài liệu');
-    }
-
-    // Kiểm tra quyền truy cập chi tiết đối với Học viên
-    if (userRole === UserRole.STUDENT) {
-      if (document.status !== DocumentStatus.PUBLISHED) {
-        throw new ForbiddenException(
-          'Bạn không có quyền truy cập tài liệu này',
-        );
-      }
-
-      if (document.visibility === 'restricted') {
-        if (!document.lessonId) {
-          throw new ForbiddenException(
-            'Tài liệu bị giới hạn truy cập và chưa liên kết bài học nào',
-          );
-        }
-
-        // Kiểm tra học viên có đăng ký khóa học chứa bài học đó không
-        const isEnrolled = await this.dataSource
-          .getRepository(Document)
-          .createQueryBuilder('doc')
-          .where('doc.id = :id', { id })
-          .andWhere(
-            `EXISTS (
-            SELECT 1 FROM enrollments enrollment
-            INNER JOIN lessons lesson ON lesson.id = doc.lesson_id
-            INNER JOIN curriculum_chapters chapter ON chapter.id = lesson.chapter_id
-            WHERE enrollment.student_id = :userId AND enrollment.course_id = chapter.course_id AND enrollment.status = 'active'
-          )`,
-          )
-          .setParameters({ userId })
-          .getOne();
-
-        if (!isEnrolled) {
-          throw new ForbiddenException(
-            'Bạn không có quyền truy cập tài liệu thuộc lớp học chưa đăng ký',
-          );
-        }
-      }
-    }
-
-    return {
-      success: true,
-      data: document,
-    };
-  }
-
-  /**
-   * Cập nhật metadata tài liệu (tiêu đề, chế độ hiển thị, trạng thái)
-   */
-  async update(
-    id: string,
-    dto: UpdateDocumentDto,
-    userId: string,
-    userRole: UserRole,
-  ) {
-    const document = await this.documentRepository.findOne({ where: { id } });
-    if (!document) {
-      throw new NotFoundException('Không tìm thấy tài liệu cần cập nhật');
-    }
-
-    // Kiểm soát quyền: Giảng viên chỉ được sửa tài liệu của chính mình
-    if (userRole === UserRole.LECTURER && document.ownerId !== userId) {
-      throw new ForbiddenException(
-        'Bạn không có quyền cập nhật thông tin tài liệu này',
-      );
-    }
-
-    Object.assign(document, {
-      ...dto,
-      updatedBy: userId,
-    });
-
-    const updated = await this.documentRepository.save(document);
-    return {
-      success: true,
-      message: 'Cập nhật thông tin tài liệu thành công',
-      data: updated,
-    };
-  }
-
-  /**
-   * Soft-delete xóa tài liệu
-   */
-  async remove(id: string, userId: string, userRole: UserRole) {
-    const document = await this.documentRepository.findOne({ where: { id } });
-    if (!document) {
-      throw new NotFoundException('Không tìm thấy tài liệu cần xóa');
-    }
-
-    // Kiểm soát quyền: Giảng viên chỉ được xóa tài liệu của chính mình
-    if (userRole === UserRole.LECTURER && document.ownerId !== userId) {
-      throw new ForbiddenException('Bạn không có quyền xóa tài liệu này');
-    }
-
-    await this.documentRepository.softRemove(document);
-    return {
-      success: true,
-      message: 'Xóa tài liệu thành công',
-    };
   }
 }
