@@ -20,7 +20,7 @@ export class AuthService {
     private configService: ConfigService,
     @Inject('REDIS_CLIENT') private redisClient: Redis,
     private mailService: MailService,
-  ) { }
+  ) {}
 
   async login(loginDto: LoginDto) {
     const user = await this.userRepository.findOne({

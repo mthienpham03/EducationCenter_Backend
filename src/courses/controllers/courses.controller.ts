@@ -23,7 +23,13 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../users/models/User.entity';
 import { CoursesService } from '../services/courses.service';
 import { CreateCourseDto, UpdateCourseDto } from '../dto/course.dto';
-import { CreateClassDto, UpdateClassDto, AssignLecturerDto, EnrollStudentDto, TransferStudentDto } from '../dto/class.dto';
+import {
+  CreateClassDto,
+  UpdateClassDto,
+  AssignLecturerDto,
+  EnrollStudentDto,
+  TransferStudentDto,
+} from '../dto/class.dto';
 
 @ApiTags('Courses & Classes Management')
 @ApiBearerAuth()
@@ -44,16 +50,35 @@ export class CoursesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Lấy danh sách khóa học (Có tìm kiếm & lọc trạng thái theo vai trò)' })
-  @ApiQuery({ name: 'search', required: false, description: 'Tìm kiếm theo tên hoặc mã khóa học' })
-  @ApiQuery({ name: 'status', required: false, description: 'Trạng thái khóa học (draft / published / archived)' })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách khóa học thành công' })
+  @ApiOperation({
+    summary:
+      'Lấy danh sách khóa học (Có tìm kiếm & lọc trạng thái theo vai trò)',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Tìm kiếm theo tên hoặc mã khóa học',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Trạng thái khóa học (draft / published / archived)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách khóa học thành công',
+  })
   async findAllCourses(
     @Req() req,
     @Query('search') search?: string,
     @Query('status') status?: string,
   ) {
-    return this.coursesService.findAllCourses(req.user.id, req.user.role, search, status);
+    return this.coursesService.findAllCourses(
+      req.user.id,
+      req.user.role,
+      search,
+      status,
+    );
   }
 
   @Get(':id')
@@ -68,7 +93,11 @@ export class CoursesController {
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Admin cập nhật thông tin khóa học' })
   @ApiResponse({ status: 200, description: 'Cập nhật khóa học thành công' })
-  async updateCourse(@Req() req, @Param('id') id: string, @Body() dto: UpdateCourseDto) {
+  async updateCourse(
+    @Req() req,
+    @Param('id') id: string,
+    @Body() dto: UpdateCourseDto,
+  ) {
     return this.coursesService.updateCourse(id, dto, req.user.id);
   }
 
@@ -108,7 +137,10 @@ export class CoursesController {
   @Post('classes/transfer')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Admin thực hiện điều chuyển lớp cho học viên trong cùng một khóa học' })
+  @ApiOperation({
+    summary:
+      'Admin thực hiện điều chuyển lớp cho học viên trong cùng một khóa học',
+  })
   @ApiResponse({ status: 201, description: 'Điều chuyển lớp thành công' })
   async transferStudent(@Req() req, @Body() dto: TransferStudentDto) {
     return this.coursesService.transferStudent(dto, req.user.id);
@@ -117,11 +149,30 @@ export class CoursesController {
   @Get('classes/transfer-histories')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Admin xem danh sách lịch sử biến động/điều chuyển lớp của học viên' })
-  @ApiQuery({ name: 'studentId', required: false, description: 'Lọc theo ID học viên' })
-  @ApiQuery({ name: 'courseId', required: false, description: 'Lọc theo ID khóa học' })
-  @ApiQuery({ name: 'fromClassId', required: false, description: 'Lọc theo ID lớp cũ' })
-  @ApiQuery({ name: 'toClassId', required: false, description: 'Lọc theo ID lớp mới' })
+  @ApiOperation({
+    summary:
+      'Admin xem danh sách lịch sử biến động/điều chuyển lớp của học viên',
+  })
+  @ApiQuery({
+    name: 'studentId',
+    required: false,
+    description: 'Lọc theo ID học viên',
+  })
+  @ApiQuery({
+    name: 'courseId',
+    required: false,
+    description: 'Lọc theo ID khóa học',
+  })
+  @ApiQuery({
+    name: 'fromClassId',
+    required: false,
+    description: 'Lọc theo ID lớp cũ',
+  })
+  @ApiQuery({
+    name: 'toClassId',
+    required: false,
+    description: 'Lọc theo ID lớp mới',
+  })
   @ApiResponse({ status: 200, description: 'Lấy danh sách lịch sử thành công' })
   async findTransferHistories(
     @Query('studentId') studentId?: string,
@@ -129,7 +180,12 @@ export class CoursesController {
     @Query('fromClassId') fromClassId?: string,
     @Query('toClassId') toClassId?: string,
   ) {
-    return this.coursesService.findTransferHistories({ studentId, courseId, fromClassId, toClassId });
+    return this.coursesService.findTransferHistories({
+      studentId,
+      courseId,
+      fromClassId,
+      toClassId,
+    });
   }
 
   @Get('classes/:id')
@@ -144,7 +200,11 @@ export class CoursesController {
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Admin cập nhật thông tin lớp học' })
   @ApiResponse({ status: 200, description: 'Cập nhật lớp học thành công' })
-  async updateClass(@Req() req, @Param('id') id: string, @Body() dto: UpdateClassDto) {
+  async updateClass(
+    @Req() req,
+    @Param('id') id: string,
+    @Body() dto: UpdateClassDto,
+  ) {
     return this.coursesService.updateClass(id, dto, req.user.id);
   }
 
@@ -162,9 +222,14 @@ export class CoursesController {
   @Post('classes/:classId/lecturers')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Admin phân công giảng viên vào lớp (chủ nhiệm hoặc giảng dạy)' })
+  @ApiOperation({
+    summary: 'Admin phân công giảng viên vào lớp (chủ nhiệm hoặc giảng dạy)',
+  })
   @ApiResponse({ status: 201, description: 'Phân công giảng viên thành công' })
-  async assignLecturer(@Param('classId') classId: string, @Body() dto: AssignLecturerDto) {
+  async assignLecturer(
+    @Param('classId') classId: string,
+    @Body() dto: AssignLecturerDto,
+  ) {
     return this.coursesService.assignLecturer(classId, dto);
   }
 
@@ -172,14 +237,25 @@ export class CoursesController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Admin hủy phân công giảng viên khỏi lớp học' })
-  @ApiResponse({ status: 200, description: 'Hủy phân công giảng viên thành công' })
-  async removeLecturer(@Param('classId') classId: string, @Param('lecturerId') lecturerId: string) {
+  @ApiResponse({
+    status: 200,
+    description: 'Hủy phân công giảng viên thành công',
+  })
+  async removeLecturer(
+    @Param('classId') classId: string,
+    @Param('lecturerId') lecturerId: string,
+  ) {
     return this.coursesService.removeLecturer(classId, lecturerId);
   }
 
   @Get('classes/:classId/lecturers')
-  @ApiOperation({ summary: 'Lấy danh sách giảng viên đã phân công của lớp học' })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách giảng viên thành công' })
+  @ApiOperation({
+    summary: 'Lấy danh sách giảng viên đã phân công của lớp học',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách giảng viên thành công',
+  })
   async findLecturersByClass(@Param('classId') classId: string) {
     return this.coursesService.findLecturersByClass(classId);
   }
@@ -189,9 +265,15 @@ export class CoursesController {
   @Post('classes/:classId/students')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Admin gán/ghi danh học viên vào lớp học (Kiểm tra sĩ số & lớp duy nhất cùng khóa)' })
+  @ApiOperation({
+    summary:
+      'Admin gán/ghi danh học viên vào lớp học (Kiểm tra sĩ số & lớp duy nhất cùng khóa)',
+  })
   @ApiResponse({ status: 201, description: 'Ghi danh học viên thành công' })
-  async enrollStudent(@Param('classId') classId: string, @Body() dto: EnrollStudentDto) {
+  async enrollStudent(
+    @Param('classId') classId: string,
+    @Body() dto: EnrollStudentDto,
+  ) {
     return this.coursesService.enrollStudent(classId, dto);
   }
 
@@ -200,15 +282,20 @@ export class CoursesController {
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Admin xóa học viên khỏi lớp học' })
   @ApiResponse({ status: 200, description: 'Xóa học viên khỏi lớp thành công' })
-  async removeStudent(@Param('classId') classId: string, @Param('studentId') studentId: string) {
+  async removeStudent(
+    @Param('classId') classId: string,
+    @Param('studentId') studentId: string,
+  ) {
     return this.coursesService.removeStudent(classId, studentId);
   }
 
   @Get('classes/:classId/students')
   @ApiOperation({ summary: 'Lấy danh sách học viên trong lớp học' })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách học viên thành công' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách học viên thành công',
+  })
   async findStudentsByClass(@Param('classId') classId: string) {
     return this.coursesService.findStudentsByClass(classId);
   }
-
 }

@@ -21,11 +21,18 @@ export class LecturerProfile {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @ManyToMany(() => Specialization, (specialization) => specialization.lecturerProfiles, { cascade: true })
+  @ManyToMany(
+    () => Specialization,
+    (specialization) => specialization.lecturerProfiles,
+    { cascade: true },
+  )
   @JoinTable({
     name: 'lecturer_profiles_specializations',
     joinColumn: { name: 'lecturer_id', referencedColumnName: 'userId' },
-    inverseJoinColumn: { name: 'specialization_id', referencedColumnName: 'id' },
+    inverseJoinColumn: {
+      name: 'specialization_id',
+      referencedColumnName: 'id',
+    },
   })
   specializations: Specialization[];
 

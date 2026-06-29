@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Course, CourseStatus } from '../models/Course.entity';
@@ -8,7 +12,13 @@ import { TeachingAssignment } from '../models/TeachingAssignment.entity';
 import { ClassTransferHistory } from '../models/ClassTransferHistory.entity';
 import { User, UserRole, UserStatus } from '../../users/models/User.entity';
 import { CreateCourseDto, UpdateCourseDto } from '../dto/course.dto';
-import { CreateClassDto, UpdateClassDto, AssignLecturerDto, EnrollStudentDto, TransferStudentDto } from '../dto/class.dto';
+import {
+  CreateClassDto,
+  UpdateClassDto,
+  AssignLecturerDto,
+  EnrollStudentDto,
+  TransferStudentDto,
+} from '../dto/class.dto';
 
 @Injectable()
 export class CoursesService {
@@ -32,7 +42,9 @@ export class CoursesService {
 
   async createCourse(dto: CreateCourseDto, creatorId?: string) {
     // Check if code is already in use
-    const existing = await this.courseRepository.findOne({ where: { code: dto.code } });
+    const existing = await this.courseRepository.findOne({
+      where: { code: dto.code },
+    });
     if (existing) {
       throw new BadRequestException('Mã khóa học này đã tồn tại trên hệ thống');
     }
@@ -51,7 +63,12 @@ export class CoursesService {
     };
   }
 
-  async findAllCourses(userId: string, role: string, search?: string, status?: string) {
+  async findAllCourses(
+    userId: string,
+    role: string,
+    search?: string,
+    status?: string,
+  ) {
     const query = this.courseRepository.createQueryBuilder('course');
 
     if (role === UserRole.LECTURER) {
@@ -82,7 +99,9 @@ export class CoursesService {
     if (status) {
       query.andWhere('course.status = :status', { status });
     } else if (role === UserRole.STUDENT) {
-      query.andWhere('course.status = :status', { status: CourseStatus.PUBLISHED });
+      query.andWhere('course.status = :status', {
+        status: CourseStatus.PUBLISHED,
+      });
     }
 
     query.orderBy('course.createdAt', 'DESC');
@@ -117,9 +136,13 @@ export class CoursesService {
     }
 
     if (dto.code && dto.code !== course.code) {
-      const existing = await this.courseRepository.findOne({ where: { code: dto.code } });
+      const existing = await this.courseRepository.findOne({
+        where: { code: dto.code },
+      });
       if (existing) {
-        throw new BadRequestException('Mã khóa học này đã tồn tại trên hệ thống');
+        throw new BadRequestException(
+          'Mã khóa học này đã tồn tại trên hệ thống',
+        );
       }
     }
 
@@ -153,7 +176,9 @@ export class CoursesService {
   // ==================== CLASS CRUD ====================
 
   async createClass(courseId: string, dto: CreateClassDto, creatorId?: string) {
-    const course = await this.courseRepository.findOne({ where: { id: courseId } });
+    const course = await this.courseRepository.findOne({
+      where: { id: courseId },
+    });
     if (!course) {
       throw new NotFoundException('Không tìm thấy khóa học tương ứng');
     }
@@ -174,7 +199,9 @@ export class CoursesService {
   }
 
   async findClassesByCourse(courseId: string) {
-    const course = await this.courseRepository.findOne({ where: { id: courseId } });
+    const course = await this.courseRepository.findOne({
+      where: { id: courseId },
+    });
     if (!course) {
       throw new NotFoundException('Không tìm thấy khóa học tương ứng');
     }
@@ -251,11 +278,15 @@ export class CoursesService {
       where: { id: dto.lecturerId, role: UserRole.LECTURER },
     });
     if (!lecturer) {
-      throw new BadRequestException('ID người dùng không phải là Giảng viên hoặc không tồn tại');
+      throw new BadRequestException(
+        'ID người dùng không phải là Giảng viên hoặc không tồn tại',
+      );
     }
 
     if (lecturer.status === UserStatus.LOCKED) {
-      throw new BadRequestException('Tài khoản giảng viên này hiện đang bị khóa');
+      throw new BadRequestException(
+        'Tài khoản giảng viên này hiện đang bị khóa',
+      );
     }
 
     // Upsert assignment
@@ -288,7 +319,9 @@ export class CoursesService {
     });
 
     if (!assignment) {
-      throw new NotFoundException('Không tìm thấy thông tin phân công giảng dạy tương ứng');
+      throw new NotFoundException(
+        'Không tìm thấy thông tin phân công giảng dạy tương ứng',
+      );
     }
 
     await this.teachingAssignmentRepository.remove(assignment);
@@ -335,11 +368,15 @@ export class CoursesService {
         where: { id: dto.studentId, role: UserRole.STUDENT },
       });
       if (!student) {
-        throw new BadRequestException('ID người dùng không phải là Học viên hoặc không tồn tại');
+        throw new BadRequestException(
+          'ID người dùng không phải là Học viên hoặc không tồn tại',
+        );
       }
 
       if (student.status === UserStatus.LOCKED) {
-        throw new BadRequestException('Tài khoản học viên này hiện đang bị khóa');
+        throw new BadRequestException(
+          'Tài khoản học viên này hiện đang bị khóa',
+        );
       }
 
       // 3. Check Capacity
@@ -349,7 +386,9 @@ export class CoursesService {
         });
 
         if (currentActiveCount >= cls.maxStudents) {
-          throw new BadRequestException('Lớp học đã đạt sĩ số tối đa, không thể gán thêm học viên');
+          throw new BadRequestException(
+            'Lớp học đã đạt sĩ số tối đa, không thể gán thêm học viên',
+          );
         }
       }
 
@@ -363,7 +402,9 @@ export class CoursesService {
       });
 
       if (activeEnrollment) {
-        const alreadyInClass = await manager.findOne(Class, { where: { id: activeEnrollment.classId } });
+        const alreadyInClass = await manager.findOne(Class, {
+          where: { id: activeEnrollment.classId },
+        });
         throw new BadRequestException(
           `Học viên này đang tham gia lớp học hoạt động khác (${alreadyInClass?.name || activeEnrollment.classId}) trong cùng một khóa học`,
         );
@@ -401,7 +442,9 @@ export class CoursesService {
     });
 
     if (!enrollment) {
-      throw new NotFoundException('Học viên không có thông tin ghi danh trong lớp học này');
+      throw new NotFoundException(
+        'Học viên không có thông tin ghi danh trong lớp học này',
+      );
     }
 
     // Instead of completely deleting, we can either hard delete or switch status to CANCELLED.
@@ -443,11 +486,15 @@ export class CoursesService {
         where: { id: dto.studentId, role: UserRole.STUDENT },
       });
       if (!student) {
-        throw new BadRequestException('ID người dùng không phải là Học viên hoặc không tồn tại');
+        throw new BadRequestException(
+          'ID người dùng không phải là Học viên hoặc không tồn tại',
+        );
       }
 
       if (student.status === UserStatus.LOCKED) {
-        throw new BadRequestException('Tài khoản học viên này hiện đang bị khóa');
+        throw new BadRequestException(
+          'Tài khoản học viên này hiện đang bị khóa',
+        );
       }
 
       // 2. Validate fromClass and toClass existence
@@ -467,11 +514,15 @@ export class CoursesService {
 
       // 3. Ensure both classes belong to the same course
       if (fromClass.courseId !== toClass.courseId) {
-        throw new BadRequestException('Hai lớp học này không thuộc cùng một khóa học');
+        throw new BadRequestException(
+          'Hai lớp học này không thuộc cùng một khóa học',
+        );
       }
 
       if (dto.fromClassId === dto.toClassId) {
-        throw new BadRequestException('Lớp học nguồn và lớp học đích không được trùng nhau');
+        throw new BadRequestException(
+          'Lớp học nguồn và lớp học đích không được trùng nhau',
+        );
       }
 
       // 4. Validate current active enrollment in fromClass
@@ -485,7 +536,9 @@ export class CoursesService {
       });
 
       if (!currentEnrollment) {
-        throw new BadRequestException('Học viên không có thông tin ghi danh hoạt động ở lớp học nguồn');
+        throw new BadRequestException(
+          'Học viên không có thông tin ghi danh hoạt động ở lớp học nguồn',
+        );
       }
 
       // 5. Check if student already has an active enrollment in toClass
@@ -498,7 +551,9 @@ export class CoursesService {
         },
       });
       if (targetActiveEnrollment) {
-        throw new BadRequestException('Học viên đã hoạt động trong lớp học đích rồi');
+        throw new BadRequestException(
+          'Học viên đã hoạt động trong lớp học đích rồi',
+        );
       }
 
       // 6. Check capacity of toClass
@@ -508,7 +563,9 @@ export class CoursesService {
         });
 
         if (currentActiveCount >= toClass.maxStudents) {
-          throw new BadRequestException('Lớp học đích đã đạt sĩ số tối đa, không thể điều chuyển thêm học viên');
+          throw new BadRequestException(
+            'Lớp học đích đã đạt sĩ số tối đa, không thể điều chuyển thêm học viên',
+          );
         }
       }
 
@@ -574,16 +631,22 @@ export class CoursesService {
       .leftJoinAndSelect('history.transferredByUser', 'admin');
 
     if (query.studentId) {
-      qb.andWhere('history.studentId = :studentId', { studentId: query.studentId });
+      qb.andWhere('history.studentId = :studentId', {
+        studentId: query.studentId,
+      });
     }
     if (query.courseId) {
       qb.andWhere('history.courseId = :courseId', { courseId: query.courseId });
     }
     if (query.fromClassId) {
-      qb.andWhere('history.fromClassId = :fromClassId', { fromClassId: query.fromClassId });
+      qb.andWhere('history.fromClassId = :fromClassId', {
+        fromClassId: query.fromClassId,
+      });
     }
     if (query.toClassId) {
-      qb.andWhere('history.toClassId = :toClassId', { toClassId: query.toClassId });
+      qb.andWhere('history.toClassId = :toClassId', {
+        toClassId: query.toClassId,
+      });
     }
 
     qb.orderBy('history.transferredAt', 'DESC');
