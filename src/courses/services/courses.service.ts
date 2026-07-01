@@ -44,6 +44,7 @@ export class CoursesService {
     // Check if code is already in use
     const existing = await this.courseRepository.findOne({
       where: { code: dto.code },
+      withDeleted: true,
     });
     if (existing) {
       throw new BadRequestException('Mã khóa học này đã tồn tại trên hệ thống');
