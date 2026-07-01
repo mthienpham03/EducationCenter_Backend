@@ -14,12 +14,20 @@ import { MailModule } from './utils/mail/modules/mail.module';
 import { UsersModule } from './users/modules/users.module';
 import { SpecializationsModule } from './specializations/modules/specializations.module';
 import { CoursesModule } from './courses/modules/courses.module';
+import { CurriculumModule } from './curriculum/modules/curriculum.module';
+import { DocumentsModule } from './documents/modules/documents.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, jwtConfig, redisConfig, mailConfig, cloudinaryConfig],
+      load: [
+        databaseConfig,
+        jwtConfig,
+        redisConfig,
+        mailConfig,
+        cloudinaryConfig,
+      ],
       envFilePath: '.env',
     }),
     DatabaseModule,
@@ -29,6 +37,8 @@ import { CoursesModule } from './courses/modules/courses.module';
     UsersModule,
     SpecializationsModule,
     CoursesModule,
+    CurriculumModule,
+    DocumentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

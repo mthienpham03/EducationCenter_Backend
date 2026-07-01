@@ -7,7 +7,10 @@ import { StudentProfile } from './students/models/StudentProfile.entity';
 import { Specialization } from './specializations/models/Specialization.entity';
 import { Course, CourseStatus } from './courses/models/Course.entity';
 import { Class, ClassStatus } from './courses/models/Class.entity';
-import { Enrollment, EnrollmentStatus } from './courses/models/Enrollment.entity';
+import {
+  Enrollment,
+  EnrollmentStatus,
+} from './courses/models/Enrollment.entity';
 import { TeachingAssignment } from './courses/models/TeachingAssignment.entity';
 import * as bcrypt from 'bcrypt';
 
@@ -67,7 +70,9 @@ async function bootstrap() {
     savedLecturer = await userRepository.save(newLecturer);
 
     const specializationRepository = dataSource.getRepository(Specialization);
-    let spec = await specializationRepository.findOne({ where: { code: 'IT' } });
+    let spec = await specializationRepository.findOne({
+      where: { code: 'IT' },
+    });
     if (!spec) {
       spec = specializationRepository.create({
         code: 'IT',
@@ -132,15 +137,41 @@ async function bootstrap() {
   console.log('Seeding courses and classes...');
   const courseRepository = dataSource.getRepository(Course);
   const classRepository = dataSource.getRepository(Class);
-  const teachingAssignmentRepository = dataSource.getRepository(TeachingAssignment);
+  const teachingAssignmentRepository =
+    dataSource.getRepository(TeachingAssignment);
   const enrollmentRepository = dataSource.getRepository(Enrollment);
 
   const courseData = [
-    { code: 'CS101', name: 'Nhập môn Khoa học Máy tính', description: 'Giới thiệu về khoa học máy tính và lập trình cơ bản', status: CourseStatus.PUBLISHED },
-    { code: 'CS102', name: 'Cấu trúc Dữ liệu và Giải thuật', description: 'Các cấu trúc dữ liệu cơ bản và giải thuật thông dụng', status: CourseStatus.PUBLISHED },
-    { code: 'CS103', name: 'Lập trình Web nâng cao', description: 'Xây dựng ứng dụng web với React và Node.js', status: CourseStatus.DRAFT },
-    { code: 'CS104', name: 'Trí tuệ Nhân tạo', description: 'Khái niệm cơ bản về AI và Học máy', status: CourseStatus.PUBLISHED },
-    { code: 'CS105', name: 'Kiến trúc Phần mềm nâng cao', description: 'Các mẫu thiết kế và kiến trúc hệ thống lớn', status: CourseStatus.PUBLISHED },
+    {
+      code: 'CS101',
+      name: 'Nhập môn Khoa học Máy tính',
+      description: 'Giới thiệu về khoa học máy tính và lập trình cơ bản',
+      status: CourseStatus.PUBLISHED,
+    },
+    {
+      code: 'CS102',
+      name: 'Cấu trúc Dữ liệu và Giải thuật',
+      description: 'Các cấu trúc dữ liệu cơ bản và giải thuật thông dụng',
+      status: CourseStatus.PUBLISHED,
+    },
+    {
+      code: 'CS103',
+      name: 'Lập trình Web nâng cao',
+      description: 'Xây dựng ứng dụng web với React và Node.js',
+      status: CourseStatus.DRAFT,
+    },
+    {
+      code: 'CS104',
+      name: 'Trí tuệ Nhân tạo',
+      description: 'Khái niệm cơ bản về AI và Học máy',
+      status: CourseStatus.PUBLISHED,
+    },
+    {
+      code: 'CS105',
+      name: 'Kiến trúc Phần mềm nâng cao',
+      description: 'Các mẫu thiết kế và kiến trúc hệ thống lớn',
+      status: CourseStatus.PUBLISHED,
+    },
   ];
 
   const coursesMap: Record<string, Course> = {};
@@ -169,7 +200,9 @@ async function bootstrap() {
   for (const code of Object.keys(coursesMap)) {
     const course = coursesMap[code];
     const className = `${code}-L01`;
-    let cls = await classRepository.findOne({ where: { courseId: course.id, name: className } });
+    let cls = await classRepository.findOne({
+      where: { courseId: course.id, name: className },
+    });
     if (!cls) {
       cls = classRepository.create({
         courseId: course.id,
@@ -200,7 +233,11 @@ async function bootstrap() {
       const cls = classesMap[item.code];
       if (course && cls) {
         let assign = await teachingAssignmentRepository.findOne({
-          where: { lecturerId: savedLecturer.id, courseId: course.id, classId: cls.id }
+          where: {
+            lecturerId: savedLecturer.id,
+            courseId: course.id,
+            classId: cls.id,
+          },
         });
         if (!assign) {
           assign = teachingAssignmentRepository.create({
@@ -226,7 +263,11 @@ async function bootstrap() {
       const cls = classesMap[code];
       if (course && cls) {
         let enrollment = await enrollmentRepository.findOne({
-          where: { studentId: savedStudent.id, courseId: course.id, classId: cls.id }
+          where: {
+            studentId: savedStudent.id,
+            courseId: course.id,
+            classId: cls.id,
+          },
         });
         if (!enrollment) {
           enrollment = enrollmentRepository.create({
@@ -250,4 +291,3 @@ bootstrap().catch((err) => {
   console.error('Error during seeding:', err);
   process.exit(1);
 });
-
