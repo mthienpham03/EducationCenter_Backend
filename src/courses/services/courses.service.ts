@@ -6,7 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Course, CourseStatus } from '../models/Course.entity';
-import { Class } from '../models/Class.entity';
+import { Class, ClassStatus } from '../models/Class.entity';
 import { Enrollment, EnrollmentStatus } from '../models/Enrollment.entity';
 import { TeachingAssignment } from '../models/TeachingAssignment.entity';
 import { ClassTransferHistory } from '../models/ClassTransferHistory.entity';
@@ -548,6 +548,19 @@ export class CoursesService {
         );
       }
 
+      // 3.5 Ensure both classes are ACTIVE
+      if (fromClass.status !== ClassStatus.ACTIVE) {
+        throw new BadRequestException(
+          'Chỉ có thể chuyển học viên từ lớp học đang hoạt động (ACTIVE)',
+        );
+      }
+
+      if (toClass.status !== ClassStatus.ACTIVE) {
+        throw new BadRequestException(
+          'Chỉ có thể chuyển học viên sang lớp học đang hoạt động (ACTIVE)',
+        );
+      }
+
       // 4. Validate current active enrollment in fromClass
       const currentEnrollment = await manager.findOne(Enrollment, {
         where: {
@@ -630,6 +643,9 @@ export class CoursesService {
         transferredBy: adminId,
       });
       await manager.save(ClassTransferHistory, history);
+
+      // 10. TODO: Di chuyển các bản ghi điểm danh (Attendance), kết quả bài tập/quiz (QuizAttempts) 
+      // ràng buộc với học viên từ fromClass sang toClass ở đây trong tương lai.
 
       return {
         success: true,
