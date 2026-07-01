@@ -259,16 +259,27 @@ export class CoursesService {
   }
 
   async removeClass(id: string) {
-    const cls = await this.classRepository.findOne({ where: { id } });
-    if (!cls) {
-      throw new NotFoundException('Không tìm thấy lớp học');
-    }
+    return await this.dataSource.transaction(async (manager) => {
+      const cls = await manager.findOne(Class, { where: { id } });
+      if (!cls) {
+        throw new NotFoundException('Không tìm thấy lớp học');
+      }
 
-    await this.classRepository.softRemove(cls);
-    return {
-      success: true,
-      message: 'Xóa lớp học thành công',
-    };
+      await manager.softRemove(Class, cls);
+
+      // Khi lớp bị xóa, cập nhật các ghi danh đang ACTIVE thành CANCELLED
+      // để học viên không bị kẹt trạng thái và có thể được thêm vào lớp khác.
+      await manager.update(
+        Enrollment,
+        { classId: id, status: EnrollmentStatus.ACTIVE },
+        { status: EnrollmentStatus.CANCELLED },
+      );
+
+      return {
+        success: true,
+        message: 'Xóa lớp học thành công',
+      };
+    });
   }
 
   // ==================== LECTURER ASSIGNMENT ====================
