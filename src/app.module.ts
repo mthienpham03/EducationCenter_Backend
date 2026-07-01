@@ -14,6 +14,7 @@ import { MailModule } from './utils/mail/modules/mail.module';
 import { UsersModule } from './users/modules/users.module';
 import { SpecializationsModule } from './specializations/modules/specializations.module';
 import { CoursesModule } from './courses/modules/courses.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { CoursesModule } from './courses/modules/courses.module';
       load: [databaseConfig, jwtConfig, redisConfig, mailConfig, cloudinaryConfig],
       envFilePath: '.env',
     }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     RedisModule,
     MailModule,

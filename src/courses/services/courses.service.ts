@@ -158,6 +158,12 @@ export class CoursesService {
       throw new NotFoundException('Không tìm thấy khóa học tương ứng');
     }
 
+    if (course.status !== CourseStatus.PUBLISHED) {
+      throw new BadRequestException(
+        'Chỉ có thể tạo lớp học từ khóa học đã được xuất bản (PUBLISHED)',
+      );
+    }
+
     const newClass = this.classRepository.create({
       ...dto,
       courseId,
@@ -256,6 +262,23 @@ export class CoursesService {
 
     if (lecturer.status === UserStatus.LOCKED) {
       throw new BadRequestException('Tài khoản giảng viên này hiện đang bị khóa');
+    }
+
+    // Giới hạn số lượng Giảng viên chính và Trợ giảng
+    if (dto.role === 'lecturer' || dto.role === 'assistant') {
+      const existingRoleCount = await this.teachingAssignmentRepository.count({
+        where: { classId, role: dto.role },
+      });
+
+      // Kiểm tra xem gv này có đang giữ vai trò này rồi không (nếu là update thì không sao)
+      const isUpdatingSameRole = await this.teachingAssignmentRepository.findOne({
+        where: { classId, lecturerId: dto.lecturerId, role: dto.role },
+      });
+
+      if (!isUpdatingSameRole && existingRoleCount >= 1) {
+        const roleName = dto.role === 'lecturer' ? 'Giảng viên chính' : 'Trợ giảng';
+        throw new BadRequestException(`Lớp học này đã có đủ số lượng ${roleName} (tối đa 1). Vui lòng gỡ người cũ trước khi thêm mới.`);
+      }
     }
 
     // Upsert assignment

@@ -15,10 +15,29 @@ export class CreateClassDto {
   @Min(1, { message: 'Sĩ số học viên tối đa phải ít nhất là 1' })
   maxStudents?: number;
 
-  @ApiPropertyOptional({ description: 'Trạng thái lớp học', enum: ClassStatus, default: ClassStatus.DRAFT })
+  @ApiPropertyOptional({
+    description: 'Trạng thái lớp học',
+    enum: ClassStatus,
+    default: ClassStatus.SCHEDULED,
+  })
   @IsOptional()
   @IsEnum(ClassStatus, { message: 'Trạng thái lớp học không hợp lệ' })
   status?: ClassStatus;
+
+  @ApiPropertyOptional({ description: 'Ngày bắt đầu dự kiến', example: '2024-09-01' })
+  @IsOptional()
+  @IsString()
+  expectedStartDate?: Date;
+
+  @ApiPropertyOptional({ description: 'Ngày kết thúc dự kiến', example: '2024-12-01' })
+  @IsOptional()
+  @IsString()
+  expectedEndDate?: Date;
+
+  @ApiPropertyOptional({ description: 'Ghi chú lịch học', example: 'Tối 2-4-6 từ 18h-20h' })
+  @IsOptional()
+  @IsString()
+  scheduleNote?: string;
 }
 
 export class UpdateClassDto {
@@ -38,6 +57,21 @@ export class UpdateClassDto {
   @IsOptional()
   @IsEnum(ClassStatus, { message: 'Trạng thái lớp học không hợp lệ' })
   status?: ClassStatus;
+
+  @ApiPropertyOptional({ description: 'Ngày bắt đầu dự kiến', example: '2024-09-01' })
+  @IsOptional()
+  @IsString()
+  expectedStartDate?: Date;
+
+  @ApiPropertyOptional({ description: 'Ngày kết thúc dự kiến', example: '2024-12-01' })
+  @IsOptional()
+  @IsString()
+  expectedEndDate?: Date;
+
+  @ApiPropertyOptional({ description: 'Ghi chú lịch học', example: 'Tối 2-4-6 từ 18h-20h' })
+  @IsOptional()
+  @IsString()
+  scheduleNote?: string;
 }
 
 export class AssignLecturerDto {

@@ -175,7 +175,10 @@ async function bootstrap() {
         courseId: course.id,
         name: className,
         maxStudents: 30,
-        status: ClassStatus.PUBLISHED,
+        status: ClassStatus.ACTIVE,
+        expectedStartDate: new Date(new Date().setDate(new Date().getDate() - 10)), // 10 ngày trước
+        expectedEndDate: new Date(new Date().setDate(new Date().getDate() + 80)), // 80 ngày sau
+        scheduleNote: 'Tối thứ 2-4-6 từ 18:00 - 20:00',
         createdBy: savedAdmin?.id || null,
         updatedBy: savedAdmin?.id || null,
       });
