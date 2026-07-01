@@ -6,7 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Course, CourseStatus } from '../models/Course.entity';
-import { Class } from '../models/Class.entity';
+import { Class, ClassStatus } from '../models/Class.entity';
 import { Enrollment, EnrollmentStatus } from '../models/Enrollment.entity';
 import { TeachingAssignment } from '../models/TeachingAssignment.entity';
 import { ClassTransferHistory } from '../models/ClassTransferHistory.entity';
@@ -183,6 +183,12 @@ export class CoursesService {
       throw new NotFoundException('Không tìm thấy khóa học tương ứng');
     }
 
+    if (course.status !== CourseStatus.PUBLISHED) {
+      throw new BadRequestException(
+        'Chỉ có thể tạo lớp học từ khóa học đã được xuất bản (PUBLISHED)',
+      );
+    }
+
     const newClass = this.classRepository.create({
       ...dto,
       courseId,
@@ -287,6 +293,23 @@ export class CoursesService {
       throw new BadRequestException(
         'Tài khoản giảng viên này hiện đang bị khóa',
       );
+    }
+
+    // Giới hạn số lượng Giảng viên chính và Trợ giảng
+    if (dto.role === 'lecturer' || dto.role === 'assistant') {
+      const existingRoleCount = await this.teachingAssignmentRepository.count({
+        where: { classId, role: dto.role },
+      });
+
+      // Kiểm tra xem gv này có đang giữ vai trò này rồi không (nếu là update thì không sao)
+      const isUpdatingSameRole = await this.teachingAssignmentRepository.findOne({
+        where: { classId, lecturerId: dto.lecturerId, role: dto.role },
+      });
+
+      if (!isUpdatingSameRole && existingRoleCount >= 1) {
+        const roleName = dto.role === 'lecturer' ? 'Giảng viên chính' : 'Trợ giảng';
+        throw new BadRequestException(`Lớp học này đã có đủ số lượng ${roleName} (tối đa 1). Vui lòng gỡ người cũ trước khi thêm mới.`);
+      }
     }
 
     // Upsert assignment
@@ -525,6 +548,19 @@ export class CoursesService {
         );
       }
 
+      // 3.5 Ensure both classes are ACTIVE
+      if (fromClass.status !== ClassStatus.ACTIVE) {
+        throw new BadRequestException(
+          'Chỉ có thể chuyển học viên từ lớp học đang hoạt động (ACTIVE)',
+        );
+      }
+
+      if (toClass.status !== ClassStatus.ACTIVE) {
+        throw new BadRequestException(
+          'Chỉ có thể chuyển học viên sang lớp học đang hoạt động (ACTIVE)',
+        );
+      }
+
       // 4. Validate current active enrollment in fromClass
       const currentEnrollment = await manager.findOne(Enrollment, {
         where: {
@@ -607,6 +643,9 @@ export class CoursesService {
         transferredBy: adminId,
       });
       await manager.save(ClassTransferHistory, history);
+
+      // 10. TODO: Di chuyển các bản ghi điểm danh (Attendance), kết quả bài tập/quiz (QuizAttempts) 
+      // ràng buộc với học viên từ fromClass sang toClass ở đây trong tương lai.
 
       return {
         success: true,

@@ -11,9 +11,11 @@ import {
 import { Course } from './Course.entity';
 
 export enum ClassStatus {
-  DRAFT = 'draft',
-  PUBLISHED = 'published',
-  ARCHIVED = 'archived',
+  SCHEDULED = 'scheduled',
+  ACTIVE = 'active',
+  ON_HOLD = 'on_hold',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
 }
 
 @Entity('classes')
@@ -34,8 +36,17 @@ export class Class {
   @Column({ name: 'max_students', type: 'int', nullable: true })
   maxStudents: number | null;
 
-  @Column({ type: 'enum', enum: ClassStatus, default: ClassStatus.DRAFT })
+  @Column({ type: 'enum', enum: ClassStatus, default: ClassStatus.SCHEDULED })
   status: ClassStatus;
+
+  @Column({ name: 'expected_start_date', type: 'date', nullable: true })
+  expectedStartDate: Date | null;
+
+  @Column({ name: 'expected_end_date', type: 'date', nullable: true })
+  expectedEndDate: Date | null;
+
+  @Column({ name: 'schedule_note', type: 'text', nullable: true })
+  scheduleNote: string | null;
 
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
   createdBy: string | null;

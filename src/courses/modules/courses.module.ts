@@ -8,6 +8,8 @@ import { ClassTransferHistory } from '../models/ClassTransferHistory.entity';
 import { User } from '../../users/models/User.entity';
 import { CoursesController } from '../controllers/courses.controller';
 import { CoursesService } from '../services/courses.service';
+import { ClassCronService } from '../services/class-cron.service';
+import { UsersModule } from '../../users/modules/users.module';
 
 @Module({
   imports: [
@@ -19,9 +21,10 @@ import { CoursesService } from '../services/courses.service';
       ClassTransferHistory,
       User,
     ]),
+    UsersModule,
   ],
   controllers: [CoursesController],
-  providers: [CoursesService],
-  exports: [CoursesService],
+  providers: [CoursesService, ClassCronService],
+  exports: [CoursesService, TypeOrmModule],
 })
 export class CoursesModule {}

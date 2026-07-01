@@ -14,6 +14,7 @@ import { MailModule } from './utils/mail/modules/mail.module';
 import { UsersModule } from './users/modules/users.module';
 import { SpecializationsModule } from './specializations/modules/specializations.module';
 import { CoursesModule } from './courses/modules/courses.module';
+import { ScheduleModule } from '@nestjs/schedule';
 import { CurriculumModule } from './curriculum/modules/curriculum.module';
 import { DocumentsModule } from './documents/modules/documents.module';
 
@@ -30,6 +31,7 @@ import { DocumentsModule } from './documents/modules/documents.module';
       ],
       envFilePath: '.env',
     }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     RedisModule,
     MailModule,
