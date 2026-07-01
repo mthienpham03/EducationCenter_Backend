@@ -34,8 +34,14 @@ export class UsersService {
   }
 
   async createLecturer(createLecturerDto: CreateLecturerDto) {
-    const { email, fullName, phone, specializationIds, experienceYears, avatarUrl } =
-      createLecturerDto;
+    const {
+      email,
+      fullName,
+      phone,
+      specializationIds,
+      experienceYears,
+      avatarUrl,
+    } = createLecturerDto;
 
     // Start a transaction
     const queryRunner = this.dataSource.createQueryRunner();
@@ -72,8 +78,10 @@ export class UsersService {
       // Fetch specializations
       let specializations: Specialization[] = [];
       if (specializationIds && specializationIds.length > 0) {
-        const specializationRepository = queryRunner.manager.getRepository(Specialization);
-        specializations = await specializationRepository.createQueryBuilder('s')
+        const specializationRepository =
+          queryRunner.manager.getRepository(Specialization);
+        specializations = await specializationRepository
+          .createQueryBuilder('s')
           .where('s.id IN (:...ids)', { ids: specializationIds })
           .getMany();
       }
@@ -415,8 +423,16 @@ export class UsersService {
   }
 
   async updateLecturer(id: string, updateLecturerDto: UpdateLecturerDto) {
-    const { email, fullName, phone, specializationIds, experienceYears, degree, skills, bio } =
-      updateLecturerDto;
+    const {
+      email,
+      fullName,
+      phone,
+      specializationIds,
+      experienceYears,
+      degree,
+      skills,
+      bio,
+    } = updateLecturerDto;
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -442,9 +458,13 @@ export class UsersService {
 
       // Check email uniqueness if email is changed
       if (email && email !== user.email) {
-        const existingEmail = await userRepository.findOne({ where: { email } });
+        const existingEmail = await userRepository.findOne({
+          where: { email },
+        });
         if (existingEmail) {
-          throw new BadRequestException('Email này đã được sử dụng bởi người dùng khác');
+          throw new BadRequestException(
+            'Email này đã được sử dụng bởi người dùng khác',
+          );
         }
         user.email = email;
       }
@@ -458,7 +478,8 @@ export class UsersService {
         profile = lecturerProfileRepository.create({ userId: user.id });
       }
 
-      if (experienceYears !== undefined) profile.experienceYears = experienceYears;
+      if (experienceYears !== undefined)
+        profile.experienceYears = experienceYears;
       if (degree !== undefined) profile.degree = degree;
       if (skills !== undefined) profile.skills = skills;
       if (bio !== undefined) profile.bio = bio;
@@ -466,8 +487,10 @@ export class UsersService {
       if (specializationIds !== undefined) {
         let specializations: Specialization[] = [];
         if (specializationIds.length > 0) {
-          const specializationRepository = queryRunner.manager.getRepository(Specialization);
-          specializations = await specializationRepository.createQueryBuilder('s')
+          const specializationRepository =
+            queryRunner.manager.getRepository(Specialization);
+          specializations = await specializationRepository
+            .createQueryBuilder('s')
             .where('s.id IN (:...ids)', { ids: specializationIds })
             .getMany();
         }
@@ -503,8 +526,18 @@ export class UsersService {
   }
 
   async updateStudent(id: string, updateStudentDto: UpdateStudentDto) {
-    const { email, fullName, phone, studentCode, dateOfBirth, address, school, major, learningGoal, bio } =
-      updateStudentDto;
+    const {
+      email,
+      fullName,
+      phone,
+      studentCode,
+      dateOfBirth,
+      address,
+      school,
+      major,
+      learningGoal,
+      bio,
+    } = updateStudentDto;
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -530,9 +563,13 @@ export class UsersService {
 
       // Check email uniqueness if email is changed
       if (email && email !== user.email) {
-        const existingEmail = await userRepository.findOne({ where: { email } });
+        const existingEmail = await userRepository.findOne({
+          where: { email },
+        });
         if (existingEmail) {
-          throw new BadRequestException('Email này đã được sử dụng bởi người dùng khác');
+          throw new BadRequestException(
+            'Email này đã được sử dụng bởi người dùng khác',
+          );
         }
         user.email = email;
       }
@@ -613,7 +650,9 @@ export class UsersService {
     try {
       workbook = XLSX.read(file.buffer, { type: 'buffer' });
     } catch (e) {
-      throw new BadRequestException('Không thể đọc file Excel. Vui lòng kiểm tra lại định dạng file.');
+      throw new BadRequestException(
+        'Không thể đọc file Excel. Vui lòng kiểm tra lại định dạng file.',
+      );
     }
 
     const sheetName = workbook.SheetNames[0];
@@ -621,23 +660,33 @@ export class UsersService {
     const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
 
     if (rows.length <= 1) {
-      throw new BadRequestException('File Excel không có dữ liệu hoặc thiếu tiêu đề');
+      throw new BadRequestException(
+        'File Excel không có dữ liệu hoặc thiếu tiêu đề',
+      );
     }
 
-    const headers = rows[0].map((h) => String(h || '').trim().toLowerCase());
+    const headers = rows[0].map((h) =>
+      String(h || '')
+        .trim()
+        .toLowerCase(),
+    );
     const emailIdx = headers.findIndex((h) => h.includes('email'));
     const nameIdx = headers.findIndex(
       (h) => h.includes('tên') || h.includes('name') || h.includes('họ'),
     );
-    const codeIdx = headers.findIndex((h) => h.includes('mã') || h.includes('code'));
+    const codeIdx = headers.findIndex(
+      (h) => h.includes('mã') || h.includes('code'),
+    );
     const phoneIdx = headers.findIndex(
-      (h) => h.includes('điện thoại') || h.includes('phone') || h.includes('sđt'),
+      (h) =>
+        h.includes('điện thoại') || h.includes('phone') || h.includes('sđt'),
     );
     const dobIdx = headers.findIndex(
       (h) => h.includes('sinh') || h.includes('birth') || h.includes('dob'),
     );
     const addressIdx = headers.findIndex(
-      (h) => h.includes('địa chi') || h.includes('địa chỉ') || h.includes('address'),
+      (h) =>
+        h.includes('địa chi') || h.includes('địa chỉ') || h.includes('address'),
     );
 
     if (emailIdx === -1 || nameIdx === -1 || codeIdx === -1) {
@@ -661,7 +710,11 @@ export class UsersService {
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       // Skip completely empty rows
-      if (!row || row.length === 0 || row.every((val) => val === undefined || val === null || val === '')) {
+      if (
+        !row ||
+        row.length === 0 ||
+        row.every((val) => val === undefined || val === null || val === '')
+      ) {
         continue;
       }
 
@@ -674,7 +727,9 @@ export class UsersService {
           : null;
       const rawDob = dobIdx !== -1 ? row[dobIdx] : null;
       const address =
-        addressIdx !== -1 && row[addressIdx] !== undefined && row[addressIdx] !== null
+        addressIdx !== -1 &&
+        row[addressIdx] !== undefined &&
+        row[addressIdx] !== null
           ? String(row[addressIdx]).trim()
           : null;
 
@@ -686,7 +741,8 @@ export class UsersService {
           email: email || undefined,
           studentCode: studentCode || undefined,
           success: false,
-          message: 'Thiếu thông tin bắt buộc (Email, Họ và Tên, hoặc Mã học viên)',
+          message:
+            'Thiếu thông tin bắt buộc (Email, Họ và Tên, hoặc Mã học viên)',
         });
         continue;
       }
@@ -809,9 +865,30 @@ export class UsersService {
 
   async getImportTemplate() {
     const headers = [
-      ['Email', 'Họ và tên', 'Mã học viên', 'Số điện thoại', 'Ngày sinh', 'Địa chỉ'],
-      ['nguyenvana@gmail.com', 'Nguyễn Văn A', 'HV001', '0912345678', '2004-05-15', 'Hà Nội'],
-      ['tranvanb@gmail.com', 'Trần Văn B', 'HV002', '0987654321', '2003-10-20', 'Đà Nẵng'],
+      [
+        'Email',
+        'Họ và tên',
+        'Mã học viên',
+        'Số điện thoại',
+        'Ngày sinh',
+        'Địa chỉ',
+      ],
+      [
+        'nguyenvana@gmail.com',
+        'Nguyễn Văn A',
+        'HV001',
+        '0912345678',
+        '2004-05-15',
+        'Hà Nội',
+      ],
+      [
+        'tranvanb@gmail.com',
+        'Trần Văn B',
+        'HV002',
+        '0987654321',
+        '2003-10-20',
+        'Đà Nẵng',
+      ],
     ];
 
     const worksheet = XLSX.utils.aoa_to_sheet(headers);
@@ -869,7 +946,11 @@ export class UsersService {
     }
   }
 
-  async updateProfile(userId: string, role: UserRole, updateDto: UpdateProfileDto) {
+  async updateProfile(
+    userId: string,
+    role: UserRole,
+    updateDto: UpdateProfileDto,
+  ) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -898,7 +979,10 @@ export class UsersService {
       }
 
       // Check avatar replacement to clean up old avatar
-      if (updateDto.avatarUrl !== undefined && updateDto.avatarUrl !== user.avatarUrl) {
+      if (
+        updateDto.avatarUrl !== undefined &&
+        updateDto.avatarUrl !== user.avatarUrl
+      ) {
         if (user.avatarUrl) {
           const oldAvatarPublicId = this.extractPublicIdFromUrl(user.avatarUrl);
           if (oldAvatarPublicId) {
@@ -921,8 +1005,10 @@ export class UsersService {
         if (updateDto.specializationIds !== undefined) {
           let specializations: Specialization[] = [];
           if (updateDto.specializationIds.length > 0) {
-            const specializationRepository = queryRunner.manager.getRepository(Specialization);
-            specializations = await specializationRepository.createQueryBuilder('s')
+            const specializationRepository =
+              queryRunner.manager.getRepository(Specialization);
+            specializations = await specializationRepository
+              .createQueryBuilder('s')
               .where('s.id IN (:...ids)', { ids: updateDto.specializationIds })
               .getMany();
           }
@@ -1011,7 +1097,10 @@ export class UsersService {
             this.cloudinaryService
               .deleteFile(pid)
               .catch((err) =>
-                console.error(`Failed to delete file ${pid} from Cloudinary:`, err),
+                console.error(
+                  `Failed to delete file ${pid} from Cloudinary:`,
+                  err,
+                ),
               ),
           ),
         ).catch((err) => console.error('Cloudinary cleanup error:', err));

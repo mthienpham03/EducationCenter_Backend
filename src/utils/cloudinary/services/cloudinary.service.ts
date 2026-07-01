@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { UploadApiOptions, UploadApiResponse, v2 as cloudinary } from 'cloudinary';
+import {
+  UploadApiOptions,
+  UploadApiResponse,
+  v2 as cloudinary,
+} from 'cloudinary';
 
 @Injectable()
 export class CloudinaryService {
@@ -20,11 +24,15 @@ export class CloudinaryService {
     options?: UploadApiOptions,
   ): Promise<UploadApiResponse> {
     return new Promise((resolve, reject) => {
-      const upload = cloudinary.uploader.upload_stream(options, (error, result) => {
-        if (error) return reject(error);
-        if (!result) return reject(new Error('Cloudinary upload returned no result.'));
-        resolve(result);
-      });
+      const upload = cloudinary.uploader.upload_stream(
+        options,
+        (error, result) => {
+          if (error) return reject(error);
+          if (!result)
+            return reject(new Error('Cloudinary upload returned no result.'));
+          resolve(result);
+        },
+      );
       upload.end(file.buffer);
     });
   }

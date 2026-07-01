@@ -28,7 +28,10 @@ export class UpdateLecturerDto {
   @MaxLength(20)
   phone?: string;
 
-  @ApiPropertyOptional({ description: 'Danh sách ID chuyên ngành giảng dạy', type: [String] })
+  @ApiPropertyOptional({
+    description: 'Danh sách ID chuyên ngành giảng dạy',
+    type: [String],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
