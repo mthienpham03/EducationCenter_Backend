@@ -12,6 +12,14 @@ import {
   EnrollmentStatus,
 } from './courses/models/Enrollment.entity';
 import { TeachingAssignment } from './courses/models/TeachingAssignment.entity';
+import { CurriculumChapter } from './curriculum/models/CurriculumChapter.entity';
+import { Lesson, LessonStatus } from './curriculum/models/Lesson.entity';
+import {
+  QuestionBank,
+  QuestionStatus,
+} from './quizzes/models/QuestionBank.entity';
+import { QuestionOption } from './quizzes/models/QuestionOption.entity';
+import { QuestionTypeEnum } from './quizzes/dto/question.dto';
 import * as bcrypt from 'bcrypt';
 
 async function bootstrap() {
@@ -285,6 +293,129 @@ async function bootstrap() {
         }
       }
     }
+  }
+
+  // --- Seed Curriculum (Chapters & Lessons) ---
+  console.log('Seeding curriculum (Chapters & Lessons)...');
+  const chapterRepository = dataSource.getRepository(CurriculumChapter);
+  const lessonRepository = dataSource.getRepository(Lesson);
+
+  const cs101Course = coursesMap['CS101'];
+  let chapter1 = await chapterRepository.findOne({
+    where: { courseId: cs101Course.id, title: 'Chương 1: Mở đầu' },
+  });
+  if (!chapter1) {
+    chapter1 = chapterRepository.create({
+      courseId: cs101Course.id,
+      title: 'Chương 1: Mở đầu',
+      description: 'Các khái niệm cơ bản',
+      orderIndex: 1,
+    });
+    chapter1 = await chapterRepository.save(chapter1);
+    console.log('Created Chapter 1 for CS101');
+  } else {
+    console.log('Chapter 1 already exists. Skipping...');
+  }
+
+  let lesson1 = await lessonRepository.findOne({
+    where: { chapterId: chapter1.id, title: 'Bài 1: Máy tính là gì?' },
+  });
+  if (!lesson1) {
+    lesson1 = lessonRepository.create({
+      chapterId: chapter1.id,
+      title: 'Bài 1: Máy tính là gì?',
+      contentSummary: 'Giới thiệu về máy tính và các thành phần',
+      orderIndex: 1,
+      status: LessonStatus.PUBLISHED,
+    });
+    lesson1 = await lessonRepository.save(lesson1);
+    console.log('Created Lesson 1 for Chapter 1');
+  } else {
+    console.log('Lesson 1 already exists. Skipping...');
+  }
+
+  // --- Seed Question Bank ---
+  console.log('Seeding question bank...');
+  const questionBankRepository = dataSource.getRepository(QuestionBank);
+  const questionOptionRepository = dataSource.getRepository(QuestionOption);
+
+  let q1 = await questionBankRepository.findOne({
+    where: { courseId: cs101Course.id, content: 'Máy tính là gì?' },
+  });
+  if (!q1) {
+    q1 = questionBankRepository.create({
+      courseId: cs101Course.id,
+      lessonId: lesson1.id,
+      questionType: QuestionTypeEnum.MCQ_SINGLE,
+      content: 'Máy tính là gì?',
+      difficulty: 'Dễ',
+      status: QuestionStatus.ACTIVE,
+      createdBy: savedAdmin?.id,
+    });
+    q1 = await questionBankRepository.save(q1);
+
+    const opts1 = [
+      questionOptionRepository.create({
+        questionId: q1.id,
+        content: 'Là một thiết bị điện tử xử lý thông tin',
+        isCorrect: true,
+        orderIndex: 1,
+      }),
+      questionOptionRepository.create({
+        questionId: q1.id,
+        content: 'Là một cục sắt',
+        isCorrect: false,
+        orderIndex: 2,
+      }),
+      questionOptionRepository.create({
+        questionId: q1.id,
+        content: 'Là một loại trái cây',
+        isCorrect: false,
+        orderIndex: 3,
+      }),
+    ];
+    await questionOptionRepository.save(opts1);
+    console.log('Created MCQ question for Lesson 1');
+  } else {
+    console.log('Question 1 already exists. Skipping...');
+  }
+
+  let q2 = await questionBankRepository.findOne({
+    where: {
+      courseId: cs101Course.id,
+      content: 'CPU là viết tắt của Central Processing Unit?',
+    },
+  });
+  if (!q2) {
+    q2 = questionBankRepository.create({
+      courseId: cs101Course.id,
+      lessonId: lesson1.id,
+      questionType: QuestionTypeEnum.TRUE_FALSE,
+      content: 'CPU là viết tắt của Central Processing Unit?',
+      difficulty: 'Trung bình',
+      status: QuestionStatus.ACTIVE,
+      createdBy: savedAdmin?.id,
+    });
+    q2 = await questionBankRepository.save(q2);
+
+    const opts2 = [
+      questionOptionRepository.create({
+        questionId: q2.id,
+        content: 'Đúng',
+        isCorrect: true,
+        orderIndex: 1,
+      }),
+      questionOptionRepository.create({
+        questionId: q2.id,
+        content: 'Sai',
+        isCorrect: false,
+        orderIndex: 2,
+      }),
+    ];
+    await questionOptionRepository.save(opts2);
+    console.log('Created True/False question for Lesson 1');
+  } else {
+    console.log('Question 2 already exists. Skipping...');
   }
 
   await app.close();
