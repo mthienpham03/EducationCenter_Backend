@@ -11,8 +11,9 @@ import {
   Max,
   IsArray,
   IsNumber,
-  IsPositive,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { QuizStatus } from '../models/Quiz.entity';
 
@@ -179,5 +180,34 @@ export class AddMultipleQuestionsDto {
     type: [AddQuizQuestionDto],
   })
   @IsArray({ message: 'questions phải là mảng' })
+  @ValidateNested({ each: true })
+  @Type(() => AddQuizQuestionDto)
   questions: AddQuizQuestionDto[];
+}
+
+// ==================== ATTEMPT & SUBMIT ====================
+
+export class AnswerItemDto {
+  @ApiProperty({ description: 'ID câu hỏi', example: 'uuid-of-question' })
+  @IsUUID('4', { message: 'questionId phải là UUID hợp lệ' })
+  @IsNotEmpty()
+  questionId: string;
+
+  @ApiProperty({
+    description: 'Dữ liệu câu trả lời. Với câu trắc nghiệm: mảng optionId đã chọn. Ví dụ: ["uuid-opt-1"] hoặc ["uuid-opt-1","uuid-opt-2"]',
+    example: ['uuid-option-1'],
+  })
+  @IsArray({ message: 'answerData phải là mảng' })
+  answerData: string[];
+}
+
+export class SubmitQuizDto {
+  @ApiProperty({
+    description: 'Danh sách câu trả lời cho từng câu hỏi',
+    type: [AnswerItemDto],
+  })
+  @IsArray({ message: 'answers phải là mảng' })
+  @ValidateNested({ each: true })
+  @Type(() => AnswerItemDto)
+  answers: AnswerItemDto[];
 }
