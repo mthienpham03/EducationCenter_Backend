@@ -16,6 +16,7 @@ import { SpecializationsModule } from './specializations/modules/specializations
 import { CoursesModule } from './courses/modules/courses.module';
 import { CurriculumModule } from './curriculum/modules/curriculum.module';
 import { DocumentsModule } from './documents/modules/documents.module';
+import { QuizzesModule } from './quizzes/modules/quizzes.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { DocumentsModule } from './documents/modules/documents.module';
     CoursesModule,
     CurriculumModule,
     DocumentsModule,
+    QuizzesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
