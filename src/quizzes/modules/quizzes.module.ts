@@ -9,6 +9,7 @@ import { QuizQuestion } from '../models/QuizQuestion.entity';
 import { Course } from '../../courses/models/Course.entity';
 import { Lesson } from '../../curriculum/models/Lesson.entity';
 import { TeachingAssignment } from '../../courses/models/TeachingAssignment.entity';
+import { Enrollment } from '../../courses/models/Enrollment.entity';
 
 import { QuestionBankController } from '../controllers/question-bank.controller';
 import { QuestionBankService } from '../services/question-bank.service';
@@ -27,6 +28,7 @@ import { QuizzesService } from '../services/quizzes.service';
       Course,
       Lesson,
       TeachingAssignment,
+      Enrollment,
     ]),
   ],
   controllers: [QuestionBankController, QuizzesController],
