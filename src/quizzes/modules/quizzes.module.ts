@@ -9,9 +9,12 @@ import { QuizQuestion } from '../models/QuizQuestion.entity';
 import { Course } from '../../courses/models/Course.entity';
 import { Lesson } from '../../curriculum/models/Lesson.entity';
 import { TeachingAssignment } from '../../courses/models/TeachingAssignment.entity';
+import { Enrollment } from '../../courses/models/Enrollment.entity';
 
 import { QuestionBankController } from '../controllers/question-bank.controller';
 import { QuestionBankService } from '../services/question-bank.service';
+import { QuizzesController } from '../controllers/quizzes.controller';
+import { QuizzesService } from '../services/quizzes.service';
 
 @Module({
   imports: [
@@ -25,9 +28,11 @@ import { QuestionBankService } from '../services/question-bank.service';
       Course,
       Lesson,
       TeachingAssignment,
+      Enrollment,
     ]),
   ],
-  controllers: [QuestionBankController],
-  providers: [QuestionBankService],
+  controllers: [QuestionBankController, QuizzesController],
+  providers: [QuestionBankService, QuizzesService],
+  exports: [QuizzesService],
 })
 export class QuizzesModule {}
