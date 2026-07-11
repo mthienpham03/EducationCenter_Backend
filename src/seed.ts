@@ -20,6 +20,8 @@ import {
 } from './quizzes/models/QuestionBank.entity';
 import { QuestionOption } from './quizzes/models/QuestionOption.entity';
 import { QuestionTypeEnum } from './quizzes/dto/question.dto';
+import { Quiz, QuizStatus } from './quizzes/models/Quiz.entity';
+import { QuizQuestion } from './quizzes/models/QuizQuestion.entity';
 import * as bcrypt from 'bcrypt';
 
 async function bootstrap() {
@@ -416,6 +418,46 @@ async function bootstrap() {
     console.log('Created True/False question for Lesson 1');
   } else {
     console.log('Question 2 already exists. Skipping...');
+  }
+
+  // --- Seed Quiz & QuizQuestions ---
+  console.log('Seeding quiz...');
+  const quizRepository = dataSource.getRepository(Quiz);
+  const quizQuestionRepository = dataSource.getRepository(QuizQuestion);
+
+  let quiz1 = await quizRepository.findOne({
+    where: { courseId: cs101Course.id, title: 'Bài kiểm tra Chương 1' },
+  });
+  if (!quiz1) {
+    quiz1 = quizRepository.create({
+      courseId: cs101Course.id,
+      lessonId: lesson1.id,
+      title: 'Bài kiểm tra Chương 1',
+      durationMinutes: 15,
+      maxAttempts: 3,
+      shuffleQuestions: false,
+      status: QuizStatus.OPEN,
+      createdBy: savedAdmin?.id,
+    });
+    quiz1 = await quizRepository.save(quiz1);
+    
+    // Attach questions to Quiz
+    const qq1 = quizQuestionRepository.create({
+      quizId: quiz1.id,
+      questionId: q1.id,
+      score: 5,
+      orderIndex: 1,
+    });
+    const qq2 = quizQuestionRepository.create({
+      quizId: quiz1.id,
+      questionId: q2.id,
+      score: 5,
+      orderIndex: 2,
+    });
+    await quizQuestionRepository.save([qq1, qq2]);
+    console.log('Created Quiz for Lesson 1 with 2 questions');
+  } else {
+    console.log('Quiz 1 already exists. Skipping...');
   }
 
   await app.close();
