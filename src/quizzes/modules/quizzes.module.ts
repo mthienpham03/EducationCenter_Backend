@@ -12,6 +12,8 @@ import { TeachingAssignment } from '../../courses/models/TeachingAssignment.enti
 
 import { QuestionBankController } from '../controllers/question-bank.controller';
 import { QuestionBankService } from '../services/question-bank.service';
+import { QuizzesController } from '../controllers/quizzes.controller';
+import { QuizzesService } from '../services/quizzes.service';
 
 @Module({
   imports: [
@@ -27,7 +29,8 @@ import { QuestionBankService } from '../services/question-bank.service';
       TeachingAssignment,
     ]),
   ],
-  controllers: [QuestionBankController],
-  providers: [QuestionBankService],
+  controllers: [QuestionBankController, QuizzesController],
+  providers: [QuestionBankService, QuizzesService],
+  exports: [QuizzesService],
 })
 export class QuizzesModule {}
