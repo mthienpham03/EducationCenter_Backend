@@ -4,9 +4,11 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
+import Redis from 'ioredis';
 import { Quiz, QuizStatus } from '../models/Quiz.entity';
 import { QuizQuestion } from '../models/QuizQuestion.entity';
 import { QuizAttempt } from '../models/QuizAttempt.entity';
@@ -50,6 +52,7 @@ export class QuizzesService {
     private readonly enrollmentRepository: Repository<Enrollment>,
     @InjectRepository(TeachingAssignment)
     private readonly teachingAssignmentRepository: Repository<TeachingAssignment>,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
   // ==================== HELPERS ====================
@@ -519,6 +522,15 @@ export class QuizzesService {
     });
     const savedAttempt = await this.quizAttemptRepository.save(newAttempt);
 
+    // --- REDIS ANTI-CHEAT: Lưu Session & Timer ---
+    if (quiz.durationMinutes !== null && quiz.durationMinutes > 0) {
+      const ttlSeconds = quiz.durationMinutes * 60 + 60; // 60s grace period
+      await this.redis.setex(`quiz:timer:${savedAttempt.id}`, ttlSeconds, studentId);
+      // Khóa phiên làm bài
+      await this.redis.setex(`quiz:active:${quiz.id}:${studentId}`, ttlSeconds, savedAttempt.id);
+    }
+    // ---------------------------------------------
+
     // 6. Lấy đề (trả câu hỏi, ẩn isCorrect)
     const questions = await this.buildQuizQuestionsForStudent(quizId, quiz.shuffleQuestions);
 
@@ -591,14 +603,15 @@ export class QuizzesService {
     }
 
     // 4. Kiểm tra timeout (nếu quiz có giới hạn thời gian)
-    if (quiz.durationMinutes !== null) {
-      const elapsedMs = Date.now() - new Date(attempt.startedAt).getTime();
-      const limitMs = quiz.durationMinutes * 60 * 1000;
-      // Cho thêm 60 giây grace period
-      if (elapsedMs > limitMs + 60_000) {
+    if (quiz.durationMinutes !== null && quiz.durationMinutes > 0) {
+      const redisTimerStudent = await this.redis.get(`quiz:timer:${attemptId}`);
+      if (!redisTimerStudent) {
         throw new BadRequestException(
-          `Đã quá thời gian làm bài (${quiz.durationMinutes} phút). Không thể nộp bài.`,
+          `Đã quá thời gian làm bài (${quiz.durationMinutes} phút). Hệ thống đã khóa quyền nộp bài của bạn.`,
         );
+      }
+      if (redisTimerStudent !== studentId) {
+        throw new ForbiddenException('Lỗi xác thực, phiên làm bài không khớp với tài khoản.');
       }
     }
 
@@ -650,6 +663,10 @@ export class QuizzesService {
     attempt.submittedAt = new Date();
     attempt.totalScore = totalScore;
     await this.quizAttemptRepository.save(attempt);
+
+    // --- REDIS ANTI-CHEAT: Dọn dẹp Session & Timer ---
+    await this.redis.del(`quiz:timer:${attemptId}`);
+    await this.redis.del(`quiz:active:${quizId}:${studentId}`);
 
     return {
       success: true,
