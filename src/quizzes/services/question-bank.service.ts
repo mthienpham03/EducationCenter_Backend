@@ -182,6 +182,7 @@ export class QuestionBankService {
     const queryBuilder = this.questionBankRepository
       .createQueryBuilder('qb')
       .leftJoinAndSelect('qb.options', 'options')
+      .leftJoinAndSelect('qb.course', 'course')
       .orderBy('qb.createdAt', 'DESC')
       .addOrderBy('options.orderIndex', 'ASC');
 
