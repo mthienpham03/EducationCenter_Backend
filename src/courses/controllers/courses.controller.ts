@@ -81,6 +81,15 @@ export class CoursesController {
     );
   }
 
+  @Get('my-enrollments')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.STUDENT)
+  @ApiOperation({ summary: 'Học viên lấy danh sách khóa học và lớp học đã ghi danh' })
+  @ApiResponse({ status: 200, description: 'Lấy danh sách thành công' })
+  async getMyEnrollments(@Req() req) {
+    return this.coursesService.getMyEnrollments(req.user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết thông tin một khóa học' })
   @ApiResponse({ status: 200, description: 'Lấy chi tiết thành công' })
