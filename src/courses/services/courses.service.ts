@@ -387,6 +387,30 @@ export class CoursesService {
 
   // ==================== STUDENT ENROLLMENT ====================
 
+  async getMyEnrollments(studentId: string) {
+    const enrollments = await this.enrollmentRepository.find({
+      where: { studentId, status: EnrollmentStatus.ACTIVE },
+      relations: { course: true, studentClass: true },
+      order: { enrolledAt: 'DESC' },
+    });
+
+    return {
+      success: true,
+      data: enrollments.map((enr) => ({
+        courseId: enr.courseId,
+        courseCode: enr.course?.code,
+        courseName: enr.course?.name,
+        courseDescription: enr.course?.description,
+        courseStatus: enr.course?.status,
+        classId: enr.classId,
+        className: enr.studentClass?.name,
+        classStatus: enr.studentClass?.status,
+        enrolledAt: enr.enrolledAt,
+        completedPercent: enr.completedPercent,
+      })),
+    };
+  }
+
   async enrollStudent(classId: string, dto: EnrollStudentDto) {
     // Perform operations in a single Database Transaction for reliability (NFR-04)
     return await this.dataSource.transaction(async (manager) => {
