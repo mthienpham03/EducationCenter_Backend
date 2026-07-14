@@ -84,9 +84,9 @@ export class DocumentsService {
       return;
     }
 
-    // Nếu document không gắn lesson → chỉ admin truy cập được
+    // Nếu document không gắn lesson → chỉ owner hoặc admin truy cập được
     if (!document.lessonId) {
-      if (requireWrite && document.ownerId === user.id) {
+      if (document.ownerId === user.id) {
         return;
       }
       throw new ForbiddenException('Bạn không có quyền truy cập tài liệu này');

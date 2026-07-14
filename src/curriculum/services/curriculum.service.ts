@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -10,6 +11,8 @@ import { Lesson } from '../models/Lesson.entity';
 import { Course } from '../../courses/models/Course.entity';
 import { CreateChapterDto, UpdateChapterDto } from '../dto/chapter.dto';
 import { CreateLessonDto, UpdateLessonDto } from '../dto/lesson.dto';
+import { TeachingAssignment } from '../../courses/models/TeachingAssignment.entity';
+import { UserRole } from '../../users/models/User.entity';
 
 @Injectable()
 export class CurriculumService {
@@ -20,10 +23,23 @@ export class CurriculumService {
     private readonly lessonRepository: Repository<Lesson>,
     @InjectRepository(Course)
     private readonly courseRepository: Repository<Course>,
+    @InjectRepository(TeachingAssignment)
+    private readonly teachingAssignmentRepository: Repository<TeachingAssignment>,
     private readonly dataSource: DataSource,
   ) {}
 
   // ==================== HELPER ====================
+
+  private async checkWritePermission(courseId: string, user: { id: string, role: string }): Promise<void> {
+    if (user.role === UserRole.LECTURER) {
+      const assignment = await this.teachingAssignmentRepository.findOne({
+        where: { lecturerId: user.id, courseId },
+      });
+      if (!assignment) {
+        throw new ForbiddenException('Bạn không được phân công giảng dạy khóa học này');
+      }
+    }
+  }
 
   private async findCourseOrFail(courseId: string): Promise<Course> {
     const UUID_REGEX =
@@ -83,9 +99,10 @@ export class CurriculumService {
   async createChapter(
     courseId: string,
     dto: CreateChapterDto,
-    creatorId?: string,
+    user?: { id: string; role: string },
   ) {
     await this.findCourseOrFail(courseId);
+    if (user) await this.checkWritePermission(courseId, user);
 
     // Auto-assign orderIndex = max + 1
     const maxResult = await this.chapterRepository
@@ -100,8 +117,8 @@ export class CurriculumService {
       ...dto,
       courseId,
       orderIndex: nextOrder,
-      createdBy: creatorId,
-      updatedBy: creatorId,
+      createdBy: user?.id,
+      updatedBy: user?.id,
     });
 
     const saved = await this.chapterRepository.save(chapter);
@@ -156,14 +173,15 @@ export class CurriculumService {
     courseId: string,
     chapterId: string,
     dto: UpdateChapterDto,
-    updaterId?: string,
+    user?: { id: string; role: string },
   ) {
     await this.findCourseOrFail(courseId);
+    if (user) await this.checkWritePermission(courseId, user);
     const chapter = await this.findChapterOrFail(chapterId, courseId);
 
     Object.assign(chapter, {
       ...dto,
-      updatedBy: updaterId,
+      updatedBy: user?.id,
     });
 
     const updated = await this.chapterRepository.save(chapter);
@@ -174,8 +192,9 @@ export class CurriculumService {
     };
   }
 
-  async removeChapter(courseId: string, chapterId: string) {
+  async removeChapter(courseId: string, chapterId: string, user?: { id: string; role: string }) {
     await this.findCourseOrFail(courseId);
+    if (user) await this.checkWritePermission(courseId, user);
     const chapter = await this.findChapterOrFail(chapterId, courseId);
 
     // Soft-delete all lessons in this chapter first
@@ -196,8 +215,9 @@ export class CurriculumService {
     };
   }
 
-  async reorderChapters(courseId: string, orderedIds: string[]) {
+  async reorderChapters(courseId: string, orderedIds: string[], user?: { id: string; role: string }) {
     await this.findCourseOrFail(courseId);
+    if (user) await this.checkWritePermission(courseId, user);
 
     // Validate all IDs belong to this course
     const chapters = await this.chapterRepository.find({
@@ -247,9 +267,10 @@ export class CurriculumService {
     courseId: string,
     chapterId: string,
     dto: CreateLessonDto,
-    creatorId?: string,
+    user?: { id: string; role: string },
   ) {
     await this.findCourseOrFail(courseId);
+    if (user) await this.checkWritePermission(courseId, user);
     await this.findChapterOrFail(chapterId, courseId);
 
     // Auto-assign orderIndex = max + 1
@@ -265,8 +286,8 @@ export class CurriculumService {
       ...dto,
       chapterId,
       orderIndex: nextOrder,
-      createdBy: creatorId,
-      updatedBy: creatorId,
+      createdBy: user?.id,
+      updatedBy: user?.id,
     });
 
     const saved = await this.lessonRepository.save(lesson);
@@ -308,15 +329,16 @@ export class CurriculumService {
     chapterId: string,
     lessonId: string,
     dto: UpdateLessonDto,
-    updaterId?: string,
+    user?: { id: string; role: string },
   ) {
     await this.findCourseOrFail(courseId);
+    if (user) await this.checkWritePermission(courseId, user);
     await this.findChapterOrFail(chapterId, courseId);
     const lesson = await this.findLessonOrFail(lessonId, chapterId);
 
     Object.assign(lesson, {
       ...dto,
-      updatedBy: updaterId,
+      updatedBy: user?.id,
     });
 
     const updated = await this.lessonRepository.save(lesson);
@@ -327,8 +349,9 @@ export class CurriculumService {
     };
   }
 
-  async removeLesson(courseId: string, chapterId: string, lessonId: string) {
+  async removeLesson(courseId: string, chapterId: string, lessonId: string, user?: { id: string; role: string }) {
     await this.findCourseOrFail(courseId);
+    if (user) await this.checkWritePermission(courseId, user);
     await this.findChapterOrFail(chapterId, courseId);
     const lesson = await this.findLessonOrFail(lessonId, chapterId);
 
@@ -343,8 +366,10 @@ export class CurriculumService {
     courseId: string,
     chapterId: string,
     orderedIds: string[],
+    user?: { id: string; role: string },
   ) {
     await this.findCourseOrFail(courseId);
+    if (user) await this.checkWritePermission(courseId, user);
     await this.findChapterOrFail(chapterId, courseId);
 
     // Validate all IDs belong to this chapter

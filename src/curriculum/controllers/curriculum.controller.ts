@@ -43,7 +43,7 @@ export class CurriculumController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.LECTURER)
   @ApiOperation({ summary: 'Admin tạo mới một chương học trong khóa học' })
   @ApiParam({ name: 'courseId', description: 'ID khóa học' })
   @ApiResponse({ status: 201, description: 'Tạo chương học thành công' })
@@ -52,7 +52,7 @@ export class CurriculumController {
     @Param('courseId') courseId: string,
     @Body() dto: CreateChapterDto,
   ) {
-    return this.curriculumService.createChapter(courseId, dto, req.user.id);
+    return this.curriculumService.createChapter(courseId, dto, req.user);
   }
 
   @Get()
@@ -72,7 +72,7 @@ export class CurriculumController {
   // Reorder MUST be declared BEFORE :chapterId to avoid route conflict
   @Patch('reorder')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.LECTURER)
   @ApiOperation({
     summary: 'Admin sắp xếp lại vị trí các chương học trong khóa học',
   })
@@ -82,10 +82,11 @@ export class CurriculumController {
     description: 'Sắp xếp lại chương học thành công',
   })
   async reorderChapters(
+    @Req() req,
     @Param('courseId') courseId: string,
     @Body() dto: ReorderChaptersDto,
   ) {
-    return this.curriculumService.reorderChapters(courseId, dto.orderedIds);
+    return this.curriculumService.reorderChapters(courseId, dto.orderedIds, req.user);
   }
 
   @Get(':chapterId')
@@ -107,7 +108,7 @@ export class CurriculumController {
 
   @Patch(':chapterId')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.LECTURER)
   @ApiOperation({ summary: 'Admin cập nhật thông tin chương học' })
   @ApiParam({ name: 'courseId', description: 'ID khóa học' })
   @ApiParam({ name: 'chapterId', description: 'ID chương học' })
@@ -122,13 +123,13 @@ export class CurriculumController {
       courseId,
       chapterId,
       dto,
-      req.user.id,
+      req.user,
     );
   }
 
   @Delete(':chapterId')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.LECTURER)
   @ApiOperation({
     summary:
       'Admin xóa (soft-delete) chương học (kèm xóa các bài học trong chương)',
@@ -137,17 +138,18 @@ export class CurriculumController {
   @ApiParam({ name: 'chapterId', description: 'ID chương học' })
   @ApiResponse({ status: 200, description: 'Xóa chương học thành công' })
   async removeChapter(
+    @Req() req,
     @Param('courseId') courseId: string,
     @Param('chapterId') chapterId: string,
   ) {
-    return this.curriculumService.removeChapter(courseId, chapterId);
+    return this.curriculumService.removeChapter(courseId, chapterId, req.user);
   }
 
   // ==================== LESSON CRUD ====================
 
   @Post(':chapterId/lessons')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.LECTURER)
   @ApiOperation({ summary: 'Admin tạo mới một bài học trong chương' })
   @ApiParam({ name: 'courseId', description: 'ID khóa học' })
   @ApiParam({ name: 'chapterId', description: 'ID chương học' })
@@ -162,7 +164,7 @@ export class CurriculumController {
       courseId,
       chapterId,
       dto,
-      req.user.id,
+      req.user,
     );
   }
 
@@ -183,7 +185,7 @@ export class CurriculumController {
   // Reorder MUST be declared BEFORE :lessonId to avoid route conflict
   @Patch(':chapterId/lessons/reorder')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.LECTURER)
   @ApiOperation({
     summary: 'Admin sắp xếp lại vị trí các bài học trong chương',
   })
@@ -191,6 +193,7 @@ export class CurriculumController {
   @ApiParam({ name: 'chapterId', description: 'ID chương học' })
   @ApiResponse({ status: 200, description: 'Sắp xếp lại bài học thành công' })
   async reorderLessons(
+    @Req() req,
     @Param('courseId') courseId: string,
     @Param('chapterId') chapterId: string,
     @Body() dto: ReorderLessonsDto,
@@ -199,6 +202,7 @@ export class CurriculumController {
       courseId,
       chapterId,
       dto.orderedIds,
+      req.user,
     );
   }
 
@@ -218,7 +222,7 @@ export class CurriculumController {
 
   @Patch(':chapterId/lessons/:lessonId')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.LECTURER)
   @ApiOperation({ summary: 'Admin cập nhật thông tin bài học' })
   @ApiParam({ name: 'courseId', description: 'ID khóa học' })
   @ApiParam({ name: 'chapterId', description: 'ID chương học' })
@@ -236,23 +240,24 @@ export class CurriculumController {
       chapterId,
       lessonId,
       dto,
-      req.user.id,
+      req.user,
     );
   }
 
   @Delete(':chapterId/lessons/:lessonId')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.LECTURER)
   @ApiOperation({ summary: 'Admin xóa (soft-delete) bài học' })
   @ApiParam({ name: 'courseId', description: 'ID khóa học' })
   @ApiParam({ name: 'chapterId', description: 'ID chương học' })
   @ApiParam({ name: 'lessonId', description: 'ID bài học' })
   @ApiResponse({ status: 200, description: 'Xóa bài học thành công' })
   async removeLesson(
+    @Req() req,
     @Param('courseId') courseId: string,
     @Param('chapterId') chapterId: string,
     @Param('lessonId') lessonId: string,
   ) {
-    return this.curriculumService.removeLesson(courseId, chapterId, lessonId);
+    return this.curriculumService.removeLesson(courseId, chapterId, lessonId, req.user);
   }
 }
