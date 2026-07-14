@@ -25,6 +25,8 @@ import { UploadApiResponse } from 'cloudinary';
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+import { DocumentAccess } from '../models/DocumentAccess.entity';
+
 @Injectable()
 export class DocumentsService {
   constructor(
@@ -32,6 +34,8 @@ export class DocumentsService {
     private readonly documentRepository: Repository<Document>,
     @InjectRepository(DocumentVersion)
     private readonly documentVersionRepository: Repository<DocumentVersion>,
+    @InjectRepository(DocumentAccess)
+    private readonly documentAccessRepository: Repository<DocumentAccess>,
     @InjectRepository(Lesson)
     private readonly lessonRepository: Repository<Lesson>,
     @InjectRepository(CurriculumChapter)
@@ -119,31 +123,39 @@ export class DocumentsService {
         );
       }
 
-      // Document phải là published
-      if (document.status !== DocumentStatus.PUBLISHED) {
-        throw new ForbiddenException('Tài liệu này chưa được xuất bản');
+      // 1. draft hoặc archived -> không cho phép
+      if (document.status === DocumentStatus.DRAFT || document.status === DocumentStatus.ARCHIVED) {
+        throw new ForbiddenException('Tài liệu đang nháp hoặc đã lưu trữ');
       }
 
-      // Nếu visibility = public thì cho phép
-      if (document.visibility === 'public') {
+      // 2. published + public -> OK
+      if (document.status === DocumentStatus.PUBLISHED && document.visibility === 'public') {
         return;
       }
 
-      // Nếu restricted/enrolled_only: kiểm tra enrollment
-      const enrollment = await this.enrollmentRepository.findOne({
-        where: {
-          studentId: user.id,
-          courseId,
-          status: EnrollmentStatus.ACTIVE,
-        },
-      });
-
-      if (!enrollment) {
-        throw new ForbiddenException(
-          'Bạn chưa ghi danh vào khóa học chứa tài liệu này',
-        );
+      // 3. published + enrolled -> Check enrollment
+      if (document.status === DocumentStatus.PUBLISHED && document.visibility === 'enrolled') {
+        const enrollment = await this.enrollmentRepository.findOne({
+          where: { studentId: user.id, courseId, status: EnrollmentStatus.ACTIVE },
+        });
+        if (!enrollment) {
+          throw new ForbiddenException('Bạn chưa ghi danh vào khóa học chứa tài liệu này');
+        }
+        return;
       }
-      return;
+
+      // 4. restricted + restricted -> Check document_access_list
+      if (document.status === DocumentStatus.RESTRICTED && document.visibility === 'restricted') {
+        const access = await this.documentAccessRepository.findOne({
+          where: { documentId: document.id, studentId: user.id },
+        });
+        if (!access) {
+          throw new ForbiddenException('Bạn không nằm trong danh sách được cấp quyền xem tài liệu này');
+        }
+        return;
+      }
+
+      throw new ForbiddenException('Bạn không có quyền truy cập tài liệu này');
     }
 
     throw new ForbiddenException('Bạn không có quyền truy cập tài liệu này');
@@ -378,24 +390,26 @@ export class DocumentsService {
 
     // Role-based filtering
     if (user.role === UserRole.STUDENT) {
-      // Students only see published documents
-      qb.andWhere('doc.status = :publishedStatus', {
-        publishedStatus: DocumentStatus.PUBLISHED,
-      });
-
-      // Only see docs belonging to courses they're enrolled in
-      // OR documents with visibility = 'public'
       qb.andWhere(
         `(
-          doc.visibility = 'public'
-          OR EXISTS (
+          (doc.status = :publishedStatus AND doc.visibility = 'public')
+          OR
+          (doc.status = :publishedStatus AND doc.visibility = 'enrolled' AND EXISTS (
             SELECT 1 FROM enrollments e
             WHERE e.student_id = :studentId
               AND e.course_id = chapter.course_id
               AND e.status = :activeStatus
-          )
+          ))
+          OR
+          (doc.status = :restrictedStatus AND doc.visibility = 'restricted' AND EXISTS (
+            SELECT 1 FROM document_access_list dal
+            WHERE dal.student_id = :studentId
+              AND dal.document_id = doc.id
+          ))
         )`,
         {
+          publishedStatus: DocumentStatus.PUBLISHED,
+          restrictedStatus: DocumentStatus.RESTRICTED,
           studentId: user.id,
           activeStatus: EnrollmentStatus.ACTIVE,
         },
