@@ -269,9 +269,12 @@ export class DocumentsService {
     // 1. Kiểm duyệt định dạng & dung lượng
     const fileType = this.validateAndGetFileType(file);
 
+    // Fix Multer UTF-8 filename encoding issue
+    const originalNameUtf8 = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    
     // 2. Xác định tiêu đề mặc định nếu trống
     const title =
-      dto.title || this.getFileNameWithoutExtension(file.originalname);
+      dto.title || this.getFileNameWithoutExtension(originalNameUtf8);
 
     // 3. Upload file lên Cloudinary
     let uploadResult: UploadApiResponse;
