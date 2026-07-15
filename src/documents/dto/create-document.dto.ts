@@ -4,6 +4,7 @@ import {
   MaxLength,
   IsUUID,
   IsEnum,
+  IsArray,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { DocumentStatus } from '../models/Document.entity';
@@ -43,4 +44,11 @@ export class CreateDocumentDto {
   @IsOptional()
   @IsEnum(DocumentStatus, { message: 'Trạng thái tài liệu không hợp lệ' })
   status?: DocumentStatus;
+
+  @ApiPropertyOptional({
+    description: 'Danh sách ID sinh viên được phép xem tài liệu (nếu visibility = restricted)',
+    type: [String],
+  })
+  @IsOptional()
+  assignedStudentIds?: string[];
 }

@@ -334,6 +334,34 @@ export class DocumentsService {
 
       await manager.save(DocumentVersion, documentVersion);
 
+      // Nếu visibility là restricted và có assignedStudentIds, lưu vào DocumentAccess
+      if (document.visibility === 'restricted' && dto.assignedStudentIds && dto.assignedStudentIds.length > 0) {
+        // Có thể assignedStudentIds được gửi lên dưới dạng mảng JSON (nếu dùng FormData)
+        let studentIds: string[] = [];
+        
+        // Handle if it's sent as an array of strings or a JSON string array
+        if (Array.isArray(dto.assignedStudentIds)) {
+          studentIds = dto.assignedStudentIds;
+        } else if (typeof dto.assignedStudentIds === 'string') {
+          try {
+            studentIds = JSON.parse(dto.assignedStudentIds);
+          } catch (e) {
+            studentIds = [dto.assignedStudentIds];
+          }
+        }
+
+        if (Array.isArray(studentIds) && studentIds.length > 0) {
+          const accesses = studentIds.map(studentId => 
+            manager.create(DocumentAccess, {
+              documentId: savedDoc.id,
+              studentId: studentId,
+              grantedBy: user.id
+            })
+          );
+          await manager.save(DocumentAccess, accesses);
+        }
+      }
+
       // Trả về đối tượng đầy đủ
       return {
         success: true,
@@ -448,7 +476,7 @@ export class DocumentsService {
 
     const document = await this.documentRepository.findOne({
       where: { id },
-      relations: { owner: true, versions: true, lesson: true },
+      relations: { owner: true, versions: true, lesson: true, accessList: true },
       order: { versions: { versionNo: 'DESC' } },
     });
 
@@ -486,6 +514,35 @@ export class DocumentsService {
     });
 
     const updated = await this.documentRepository.save(document);
+
+    // Xử lý cập nhật danh sách DocumentAccess nếu có assignedStudentIds và visibility = restricted
+    if (updated.visibility === 'restricted' && dto.assignedStudentIds !== undefined) {
+      // Xóa các record cũ
+      await this.documentAccessRepository.delete({ documentId: updated.id });
+
+      let studentIds: string[] = [];
+      if (Array.isArray(dto.assignedStudentIds)) {
+        studentIds = dto.assignedStudentIds;
+      } else if (typeof dto.assignedStudentIds === 'string') {
+        try {
+          studentIds = JSON.parse(dto.assignedStudentIds);
+        } catch (e) {
+          studentIds = [dto.assignedStudentIds];
+        }
+      }
+
+      if (Array.isArray(studentIds) && studentIds.length > 0) {
+        const accesses = studentIds.map(studentId => 
+          this.documentAccessRepository.create({
+            documentId: updated.id,
+            studentId: studentId,
+            grantedBy: user.id
+          })
+        );
+        await this.documentAccessRepository.save(accesses);
+      }
+    }
+
     return {
       success: true,
       message: 'Cập nhật thông tin tài liệu thành công',
