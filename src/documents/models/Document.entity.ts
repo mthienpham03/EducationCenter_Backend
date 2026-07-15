@@ -12,6 +12,7 @@ import {
 import { Lesson } from '../../curriculum/models/Lesson.entity';
 import { User } from '../../users/models/User.entity';
 import { DocumentVersion } from './DocumentVersion.entity';
+import { DocumentAccess } from './DocumentAccess.entity';
 
 export enum DocumentStatus {
   DRAFT = 'draft',
@@ -71,4 +72,7 @@ export class Document {
 
   @OneToMany(() => DocumentVersion, (version) => version.document)
   versions: DocumentVersion[];
+
+  @OneToMany(() => DocumentAccess, (access) => access.document)
+  accessList: DocumentAccess[];
 }

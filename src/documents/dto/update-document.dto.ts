@@ -27,4 +27,11 @@ export class UpdateDocumentDto {
   @IsOptional()
   @IsEnum(DocumentStatus, { message: 'Trạng thái tài liệu không hợp lệ' })
   status?: DocumentStatus;
+
+  @ApiPropertyOptional({
+    description: 'Danh sách ID sinh viên được phép xem tài liệu (nếu visibility = restricted)',
+    type: [String],
+  })
+  @IsOptional()
+  assignedStudentIds?: string[];
 }

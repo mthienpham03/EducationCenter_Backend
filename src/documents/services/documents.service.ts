@@ -25,6 +25,8 @@ import { UploadApiResponse } from 'cloudinary';
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+import { DocumentAccess } from '../models/DocumentAccess.entity';
+
 @Injectable()
 export class DocumentsService {
   constructor(
@@ -32,6 +34,8 @@ export class DocumentsService {
     private readonly documentRepository: Repository<Document>,
     @InjectRepository(DocumentVersion)
     private readonly documentVersionRepository: Repository<DocumentVersion>,
+    @InjectRepository(DocumentAccess)
+    private readonly documentAccessRepository: Repository<DocumentAccess>,
     @InjectRepository(Lesson)
     private readonly lessonRepository: Repository<Lesson>,
     @InjectRepository(CurriculumChapter)
@@ -80,9 +84,9 @@ export class DocumentsService {
       return;
     }
 
-    // Nếu document không gắn lesson → chỉ admin truy cập được
+    // Nếu document không gắn lesson → chỉ owner hoặc admin truy cập được
     if (!document.lessonId) {
-      if (requireWrite && document.ownerId === user.id) {
+      if (document.ownerId === user.id) {
         return;
       }
       throw new ForbiddenException('Bạn không có quyền truy cập tài liệu này');
@@ -119,31 +123,39 @@ export class DocumentsService {
         );
       }
 
-      // Document phải là published
-      if (document.status !== DocumentStatus.PUBLISHED) {
-        throw new ForbiddenException('Tài liệu này chưa được xuất bản');
+      // 1. draft hoặc archived -> không cho phép
+      if (document.status === DocumentStatus.DRAFT || document.status === DocumentStatus.ARCHIVED) {
+        throw new ForbiddenException('Tài liệu đang nháp hoặc đã lưu trữ');
       }
 
-      // Nếu visibility = public thì cho phép
-      if (document.visibility === 'public') {
+      // 2. published + public -> OK
+      if (document.status === DocumentStatus.PUBLISHED && document.visibility === 'public') {
         return;
       }
 
-      // Nếu restricted/enrolled_only: kiểm tra enrollment
-      const enrollment = await this.enrollmentRepository.findOne({
-        where: {
-          studentId: user.id,
-          courseId,
-          status: EnrollmentStatus.ACTIVE,
-        },
-      });
-
-      if (!enrollment) {
-        throw new ForbiddenException(
-          'Bạn chưa ghi danh vào khóa học chứa tài liệu này',
-        );
+      // 3. published + enrolled -> Check enrollment
+      if (document.status === DocumentStatus.PUBLISHED && document.visibility === 'enrolled') {
+        const enrollment = await this.enrollmentRepository.findOne({
+          where: { studentId: user.id, courseId, status: EnrollmentStatus.ACTIVE },
+        });
+        if (!enrollment) {
+          throw new ForbiddenException('Bạn chưa ghi danh vào khóa học chứa tài liệu này');
+        }
+        return;
       }
-      return;
+
+      // 4. restricted + restricted -> Check document_access_list
+      if (document.status === DocumentStatus.RESTRICTED && document.visibility === 'restricted') {
+        const access = await this.documentAccessRepository.findOne({
+          where: { documentId: document.id, studentId: user.id },
+        });
+        if (!access) {
+          throw new ForbiddenException('Bạn không nằm trong danh sách được cấp quyền xem tài liệu này');
+        }
+        return;
+      }
+
+      throw new ForbiddenException('Bạn không có quyền truy cập tài liệu này');
     }
 
     throw new ForbiddenException('Bạn không có quyền truy cập tài liệu này');
@@ -257,9 +269,12 @@ export class DocumentsService {
     // 1. Kiểm duyệt định dạng & dung lượng
     const fileType = this.validateAndGetFileType(file);
 
+    // Fix Multer UTF-8 filename encoding issue
+    const originalNameUtf8 = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    
     // 2. Xác định tiêu đề mặc định nếu trống
     const title =
-      dto.title || this.getFileNameWithoutExtension(file.originalname);
+      dto.title || this.getFileNameWithoutExtension(originalNameUtf8);
 
     // 3. Upload file lên Cloudinary
     let uploadResult: UploadApiResponse;
@@ -318,6 +333,34 @@ export class DocumentsService {
       });
 
       await manager.save(DocumentVersion, documentVersion);
+
+      // Nếu visibility là restricted và có assignedStudentIds, lưu vào DocumentAccess
+      if (document.visibility === 'restricted' && dto.assignedStudentIds && dto.assignedStudentIds.length > 0) {
+        // Có thể assignedStudentIds được gửi lên dưới dạng mảng JSON (nếu dùng FormData)
+        let studentIds: string[] = [];
+        
+        // Handle if it's sent as an array of strings or a JSON string array
+        if (Array.isArray(dto.assignedStudentIds)) {
+          studentIds = dto.assignedStudentIds;
+        } else if (typeof dto.assignedStudentIds === 'string') {
+          try {
+            studentIds = JSON.parse(dto.assignedStudentIds);
+          } catch (e) {
+            studentIds = [dto.assignedStudentIds];
+          }
+        }
+
+        if (Array.isArray(studentIds) && studentIds.length > 0) {
+          const accesses = studentIds.map(studentId => 
+            manager.create(DocumentAccess, {
+              documentId: savedDoc.id,
+              studentId: studentId,
+              grantedBy: user.id
+            })
+          );
+          await manager.save(DocumentAccess, accesses);
+        }
+      }
 
       // Trả về đối tượng đầy đủ
       return {
@@ -378,24 +421,26 @@ export class DocumentsService {
 
     // Role-based filtering
     if (user.role === UserRole.STUDENT) {
-      // Students only see published documents
-      qb.andWhere('doc.status = :publishedStatus', {
-        publishedStatus: DocumentStatus.PUBLISHED,
-      });
-
-      // Only see docs belonging to courses they're enrolled in
-      // OR documents with visibility = 'public'
       qb.andWhere(
         `(
-          doc.visibility = 'public'
-          OR EXISTS (
+          (doc.status = :publishedStatus AND doc.visibility = 'public')
+          OR
+          (doc.status = :publishedStatus AND doc.visibility = 'enrolled' AND EXISTS (
             SELECT 1 FROM enrollments e
             WHERE e.student_id = :studentId
               AND e.course_id = chapter.course_id
               AND e.status = :activeStatus
-          )
+          ))
+          OR
+          (doc.status = :restrictedStatus AND doc.visibility = 'restricted' AND EXISTS (
+            SELECT 1 FROM document_access_list dal
+            WHERE dal.student_id = :studentId
+              AND dal.document_id = doc.id
+          ))
         )`,
         {
+          publishedStatus: DocumentStatus.PUBLISHED,
+          restrictedStatus: DocumentStatus.RESTRICTED,
           studentId: user.id,
           activeStatus: EnrollmentStatus.ACTIVE,
         },
@@ -431,7 +476,7 @@ export class DocumentsService {
 
     const document = await this.documentRepository.findOne({
       where: { id },
-      relations: { owner: true, versions: true, lesson: true },
+      relations: { owner: true, versions: true, lesson: true, accessList: true },
       order: { versions: { versionNo: 'DESC' } },
     });
 
@@ -469,6 +514,35 @@ export class DocumentsService {
     });
 
     const updated = await this.documentRepository.save(document);
+
+    // Xử lý cập nhật danh sách DocumentAccess nếu có assignedStudentIds và visibility = restricted
+    if (updated.visibility === 'restricted' && dto.assignedStudentIds !== undefined) {
+      // Xóa các record cũ
+      await this.documentAccessRepository.delete({ documentId: updated.id });
+
+      let studentIds: string[] = [];
+      if (Array.isArray(dto.assignedStudentIds)) {
+        studentIds = dto.assignedStudentIds;
+      } else if (typeof dto.assignedStudentIds === 'string') {
+        try {
+          studentIds = JSON.parse(dto.assignedStudentIds);
+        } catch (e) {
+          studentIds = [dto.assignedStudentIds];
+        }
+      }
+
+      if (Array.isArray(studentIds) && studentIds.length > 0) {
+        const accesses = studentIds.map(studentId => 
+          this.documentAccessRepository.create({
+            documentId: updated.id,
+            studentId: studentId,
+            grantedBy: user.id
+          })
+        );
+        await this.documentAccessRepository.save(accesses);
+      }
+    }
+
     return {
       success: true,
       message: 'Cập nhật thông tin tài liệu thành công',

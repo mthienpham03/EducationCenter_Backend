@@ -47,7 +47,7 @@ export class DocumentsController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.LECTURER)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
@@ -97,7 +97,7 @@ export class DocumentsController {
 
   @Post(':id/versions')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.LECTURER)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
@@ -189,7 +189,7 @@ export class DocumentsController {
 
   @Patch(':id')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.LECTURER)
   @ApiOperation({ summary: 'Cập nhật metadata thông tin của tài liệu' })
   @ApiResponse({ status: 200, description: 'Cập nhật tài liệu thành công' })
   async update(
@@ -202,7 +202,7 @@ export class DocumentsController {
 
   @Delete(':id')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.LECTURER)
   @ApiOperation({ summary: 'Xóa tài liệu (soft-delete)' })
   @ApiResponse({ status: 200, description: 'Xóa tài liệu thành công' })
   async remove(@Param('id') id: string, @Req() req: RequestWithUser) {
