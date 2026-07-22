@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThanOrEqual } from 'typeorm';
+import { Repository, LessThanOrEqual, LessThan } from 'typeorm';
 import { Class, ClassStatus } from '../models/Class.entity';
 
 @Injectable()
@@ -23,7 +23,7 @@ export class ClassCronService {
     today.setHours(0, 0, 0, 0);
 
     try {
-      // Tìm các lớp đang ở trạng thái SCHEDULED và có ngày bắt đầu <= hôm nay
+      // 1. Tìm các lớp đang ở trạng thái SCHEDULED và có ngày bắt đầu <= hôm nay
       const classesToActivate = await this.classRepository.find({
         where: {
           status: ClassStatus.SCHEDULED,
@@ -31,19 +31,31 @@ export class ClassCronService {
         },
       });
 
-      if (classesToActivate.length === 0) {
-        this.logger.log('Không có lớp học nào cần chuyển sang trạng thái ACTIVE hôm nay.');
-        return;
+      if (classesToActivate.length > 0) {
+        for (const cls of classesToActivate) {
+          cls.status = ClassStatus.ACTIVE;
+          cls.updatedAt = new Date();
+        }
+        await this.classRepository.save(classesToActivate);
+        this.logger.log(`Đã chuyển thành công ${classesToActivate.length} lớp học sang trạng thái ACTIVE.`);
       }
 
-      for (const cls of classesToActivate) {
-        cls.status = ClassStatus.ACTIVE;
-        cls.updatedAt = new Date();
-        // Cập nhật người sửa là system (null hoặc id mặc định nếu có)
-      }
+      // 2. Tìm các lớp đang ở trạng thái ACTIVE và có ngày kết thúc < hôm nay
+      const classesToComplete = await this.classRepository.find({
+        where: {
+          status: ClassStatus.ACTIVE,
+          expectedEndDate: LessThan(today),
+        },
+      });
 
-      await this.classRepository.save(classesToActivate);
-      this.logger.log(`Đã chuyển thành công ${classesToActivate.length} lớp học sang trạng thái ACTIVE.`);
+      if (classesToComplete.length > 0) {
+        for (const cls of classesToComplete) {
+          cls.status = ClassStatus.COMPLETED;
+          cls.updatedAt = new Date();
+        }
+        await this.classRepository.save(classesToComplete);
+        this.logger.log(`Đã chuyển thành công ${classesToComplete.length} lớp học sang trạng thái COMPLETED.`);
+      }
     } catch (error) {
       this.logger.error('Lỗi khi chạy Cron Job cập nhật trạng thái lớp học:', error);
     }

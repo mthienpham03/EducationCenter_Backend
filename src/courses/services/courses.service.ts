@@ -50,8 +50,16 @@ export class CoursesService {
       throw new BadRequestException('Mã khóa học này đã tồn tại trên hệ thống');
     }
 
+    if (dto.startDate && dto.endDate) {
+      if (new Date(dto.startDate) > new Date(dto.endDate)) {
+        throw new BadRequestException('Ngày bắt đầu không được lớn hơn ngày kết thúc');
+      }
+    }
+
     const course = this.courseRepository.create({
       ...dto,
+      startDate: dto.startDate ? new Date(dto.startDate) : null,
+      endDate: dto.endDate ? new Date(dto.endDate) : null,
       createdBy: creatorId,
       updatedBy: creatorId,
     });
@@ -147,8 +155,17 @@ export class CoursesService {
       }
     }
 
+    const nextStartDate = dto.startDate !== undefined ? (dto.startDate ? new Date(dto.startDate) : null) : course.startDate;
+    const nextEndDate = dto.endDate !== undefined ? (dto.endDate ? new Date(dto.endDate) : null) : course.endDate;
+
+    if (nextStartDate && nextEndDate && nextStartDate > nextEndDate) {
+      throw new BadRequestException('Ngày bắt đầu không được lớn hơn ngày kết thúc');
+    }
+
     Object.assign(course, {
       ...dto,
+      startDate: nextStartDate,
+      endDate: nextEndDate,
       updatedBy: updaterId,
     });
 
@@ -190,8 +207,16 @@ export class CoursesService {
       );
     }
 
+    if (dto.expectedStartDate && dto.expectedEndDate) {
+      if (new Date(dto.expectedStartDate) > new Date(dto.expectedEndDate)) {
+        throw new BadRequestException('Ngày bắt đầu dự kiến không được lớn hơn ngày kết thúc dự kiến');
+      }
+    }
+
     const newClass = this.classRepository.create({
       ...dto,
+      expectedStartDate: dto.expectedStartDate ? new Date(dto.expectedStartDate) : null,
+      expectedEndDate: dto.expectedEndDate ? new Date(dto.expectedEndDate) : null,
       courseId,
       createdBy: creatorId,
       updatedBy: creatorId,
@@ -246,8 +271,17 @@ export class CoursesService {
       throw new NotFoundException('Không tìm thấy lớp học');
     }
 
+    const nextStartDate = dto.expectedStartDate !== undefined ? (dto.expectedStartDate ? new Date(dto.expectedStartDate) : null) : cls.expectedStartDate;
+    const nextEndDate = dto.expectedEndDate !== undefined ? (dto.expectedEndDate ? new Date(dto.expectedEndDate) : null) : cls.expectedEndDate;
+
+    if (nextStartDate && nextEndDate && nextStartDate > nextEndDate) {
+      throw new BadRequestException('Ngày bắt đầu dự kiến không được lớn hơn ngày kết thúc dự kiến');
+    }
+
     Object.assign(cls, {
       ...dto,
+      expectedStartDate: nextStartDate,
+      expectedEndDate: nextEndDate,
       updatedBy: updaterId,
     });
 
