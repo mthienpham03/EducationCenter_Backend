@@ -16,6 +16,7 @@ import { QuestionOption } from './QuestionOption.entity';
 export enum QuestionStatus {
   ACTIVE = 'active',
   INACTIVE = 'inactive',
+  PENDING = 'pending',
 }
 
 @Entity('question_bank')
