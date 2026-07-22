@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsDateString,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CourseStatus } from '../models/Course.entity';
 
@@ -65,6 +66,7 @@ export class CreateCourseDto {
     example: '2026-06-15',
   })
   @IsOptional()
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
   @IsDateString({}, { message: 'Ngày bắt đầu không hợp lệ' })
   startDate?: string;
 
@@ -73,6 +75,7 @@ export class CreateCourseDto {
     example: '2026-09-15',
   })
   @IsOptional()
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
   @IsDateString({}, { message: 'Ngày kết thúc không hợp lệ' })
   endDate?: string;
 }
@@ -135,6 +138,7 @@ export class UpdateCourseDto {
     example: '2026-06-15',
   })
   @IsOptional()
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
   @IsDateString({}, { message: 'Ngày bắt đầu không hợp lệ' })
   startDate?: string;
 
@@ -143,6 +147,7 @@ export class UpdateCourseDto {
     example: '2026-09-15',
   })
   @IsOptional()
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
   @IsDateString({}, { message: 'Ngày kết thúc không hợp lệ' })
   endDate?: string;
 }

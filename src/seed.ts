@@ -151,36 +151,47 @@ async function bootstrap() {
     dataSource.getRepository(TeachingAssignment);
   const enrollmentRepository = dataSource.getRepository(Enrollment);
 
+  const now = new Date();
   const courseData = [
     {
       code: 'CS101',
       name: 'Nhập môn Khoa học Máy tính',
       description: 'Giới thiệu về khoa học máy tính và lập trình cơ bản',
       status: CourseStatus.PUBLISHED,
+      startDate: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+      endDate: new Date(now.getFullYear(), now.getMonth() + 2, 28),
     },
     {
       code: 'CS102',
       name: 'Cấu trúc Dữ liệu và Giải thuật',
       description: 'Các cấu trúc dữ liệu cơ bản và giải thuật thông dụng',
       status: CourseStatus.PUBLISHED,
+      startDate: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+      endDate: new Date(now.getFullYear(), now.getMonth() + 4, 30),
     },
     {
       code: 'CS103',
       name: 'Lập trình Web nâng cao',
       description: 'Xây dựng ứng dụng web với React và Node.js',
       status: CourseStatus.DRAFT,
+      startDate: new Date(now.getFullYear(), now.getMonth(), 15),
+      endDate: new Date(now.getFullYear(), now.getMonth() + 3, 15),
     },
     {
       code: 'CS104',
       name: 'Trí tuệ Nhân tạo',
       description: 'Khái niệm cơ bản về AI và Học máy',
       status: CourseStatus.PUBLISHED,
+      startDate: new Date(now.getFullYear(), now.getMonth() - 5, 1),
+      endDate: new Date(now.getFullYear(), now.getMonth() - 1, 30),
     },
     {
       code: 'CS105',
       name: 'Kiến trúc Phần mềm nâng cao',
       description: 'Các mẫu thiết kế và kiến trúc hệ thống lớn',
       status: CourseStatus.PUBLISHED,
+      startDate: new Date(now.getFullYear(), now.getMonth() - 2, 1),
+      endDate: new Date(now.getFullYear(), now.getMonth() + 1, 28),
     },
   ];
 
@@ -194,13 +205,19 @@ async function bootstrap() {
         name: c.name,
         description: c.description,
         status: c.status,
+        startDate: c.startDate,
+        endDate: c.endDate,
         createdBy: savedAdmin?.id || null,
         updatedBy: savedAdmin?.id || null,
       });
       course = await courseRepository.save(course);
       console.log(`Created course: ${c.code}`);
     } else {
-      console.log(`Course ${c.code} already exists. Skipping...`);
+      // Update dates if null
+      course.startDate = c.startDate;
+      course.endDate = c.endDate;
+      course = await courseRepository.save(course);
+      console.log(`Course ${c.code} updated with dates.`);
     }
     coursesMap[c.code] = course;
   }

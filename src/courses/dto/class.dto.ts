@@ -7,7 +7,9 @@ import {
   IsInt,
   Min,
   IsUUID,
+  IsDateString,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ClassStatus } from '../models/Class.entity';
 
@@ -35,13 +37,15 @@ export class CreateClassDto {
 
   @ApiPropertyOptional({ description: 'Ngày bắt đầu dự kiến', example: '2024-09-01' })
   @IsOptional()
-  @IsString()
-  expectedStartDate?: Date;
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
+  @IsDateString({}, { message: 'Ngày bắt đầu dự kiến không hợp lệ' })
+  expectedStartDate?: string;
 
   @ApiPropertyOptional({ description: 'Ngày kết thúc dự kiến', example: '2024-12-01' })
   @IsOptional()
-  @IsString()
-  expectedEndDate?: Date;
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
+  @IsDateString({}, { message: 'Ngày kết thúc dự kiến không hợp lệ' })
+  expectedEndDate?: string;
 
   @ApiPropertyOptional({ description: 'Ghi chú lịch học', example: 'Tối 2-4-6 từ 18h-20h' })
   @IsOptional()
@@ -69,13 +73,15 @@ export class UpdateClassDto {
 
   @ApiPropertyOptional({ description: 'Ngày bắt đầu dự kiến', example: '2024-09-01' })
   @IsOptional()
-  @IsString()
-  expectedStartDate?: Date;
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
+  @IsDateString({}, { message: 'Ngày bắt đầu dự kiến không hợp lệ' })
+  expectedStartDate?: string;
 
   @ApiPropertyOptional({ description: 'Ngày kết thúc dự kiến', example: '2024-12-01' })
   @IsOptional()
-  @IsString()
-  expectedEndDate?: Date;
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
+  @IsDateString({}, { message: 'Ngày kết thúc dự kiến không hợp lệ' })
+  expectedEndDate?: string;
 
   @ApiPropertyOptional({ description: 'Ghi chú lịch học', example: 'Tối 2-4-6 từ 18h-20h' })
   @IsOptional()

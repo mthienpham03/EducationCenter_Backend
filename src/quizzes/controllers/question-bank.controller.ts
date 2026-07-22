@@ -22,7 +22,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../users/models/User.entity';
 import { QuestionBankService } from '../services/question-bank.service';
-import { CreateQuestionDto, UpdateQuestionDto } from '../dto/question.dto';
+import { CreateQuestionDto, UpdateQuestionDto, ReviewQuestionDto } from '../dto/question.dto';
 
 @ApiTags('Question Bank')
 @ApiBearerAuth()
@@ -49,12 +49,14 @@ export class QuestionBankController {
   @ApiQuery({ name: 'courseId', required: false })
   @ApiQuery({ name: 'lessonId', required: false })
   @ApiQuery({ name: 'type', required: false })
+  @ApiQuery({ name: 'approvalStatus', required: false })
   @ApiResponse({ status: 200, description: 'Lấy danh sách thành công' })
   async findQuestions(
     @Req() req,
     @Query('courseId') courseId?: string,
     @Query('lessonId') lessonId?: string,
     @Query('type') type?: string,
+    @Query('approvalStatus') approvalStatus?: string,
   ) {
     return this.questionBankService.findQuestions(
       req.user.id,
@@ -62,6 +64,7 @@ export class QuestionBankController {
       courseId,
       lessonId,
       type,
+      approvalStatus,
     );
   }
 
@@ -91,6 +94,22 @@ export class QuestionBankController {
       dto,
       req.user.id,
       req.user.role,
+    );
+  }
+
+  @Patch(':id/review')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Admin phê duyệt hoặc từ chối câu hỏi của giảng viên' })
+  @ApiResponse({ status: 200, description: 'Kiểm duyệt câu hỏi thành công' })
+  async reviewQuestion(
+    @Req() req,
+    @Param('id') id: string,
+    @Body() dto: ReviewQuestionDto,
+  ) {
+    return this.questionBankService.reviewQuestion(
+      id,
+      dto,
+      req.user.id,
     );
   }
 

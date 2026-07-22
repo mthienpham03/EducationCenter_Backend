@@ -12,12 +12,23 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { QuestionStatus } from '../models/QuestionBank.entity';
+import { QuestionStatus, QuestionApprovalStatus } from '../models/QuestionBank.entity';
 
 export enum QuestionTypeEnum {
   MCQ_SINGLE = 'MCQ_SINGLE',
   MCQ_MULTIPLE = 'MCQ_MULTIPLE',
   TRUE_FALSE = 'TRUE_FALSE',
+}
+
+export class ReviewQuestionDto {
+  @ApiProperty({ description: 'Trạng thái kiểm duyệt', enum: QuestionApprovalStatus, example: QuestionApprovalStatus.APPROVED })
+  @IsEnum(QuestionApprovalStatus, { message: 'Trạng thái duyệt không hợp lệ' })
+  status: QuestionApprovalStatus;
+
+  @ApiPropertyOptional({ description: 'Lý do từ chối (bắt buộc nếu từ chối)', example: 'Nội dung câu hỏi chưa chính xác' })
+  @IsOptional()
+  @IsString()
+  rejectionReason?: string;
 }
 
 export class CreateQuestionOptionDto {
@@ -66,6 +77,11 @@ export class CreateQuestionDto {
   @IsEnum(QuestionStatus)
   status?: QuestionStatus;
 
+  @ApiPropertyOptional({ description: 'Trạng thái duyệt (Admin truyền hoặc mặc định)', enum: QuestionApprovalStatus })
+  @IsOptional()
+  @IsEnum(QuestionApprovalStatus)
+  approvalStatus?: QuestionApprovalStatus;
+
   @ApiProperty({ type: [CreateQuestionOptionDto], description: 'Danh sách đáp án' })
   @IsArray()
   @ValidateNested({ each: true })
@@ -94,6 +110,11 @@ export class UpdateQuestionDto {
   @IsOptional()
   @IsEnum(QuestionStatus)
   status?: QuestionStatus;
+
+  @ApiPropertyOptional({ description: 'Trạng thái duyệt', enum: QuestionApprovalStatus })
+  @IsOptional()
+  @IsEnum(QuestionApprovalStatus)
+  approvalStatus?: QuestionApprovalStatus;
 
   @ApiPropertyOptional({ type: [CreateQuestionOptionDto], description: 'Ghi đè lại toàn bộ đáp án' })
   @IsOptional()
