@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { QuestionBank } from '../models/QuestionBank.entity';
+import { QuestionBank, QuestionApprovalStatus } from '../models/QuestionBank.entity';
 import { QuestionOption } from '../models/QuestionOption.entity';
 import { Course } from '../../courses/models/Course.entity';
 import { Lesson } from '../../curriculum/models/Lesson.entity';
@@ -15,6 +15,7 @@ import { UserRole } from '../../users/models/User.entity';
 import {
   CreateQuestionDto,
   UpdateQuestionDto,
+  ReviewQuestionDto,
   QuestionTypeEnum,
 } from '../dto/question.dto';
 
@@ -32,7 +33,7 @@ export class QuestionBankService {
     @InjectRepository(TeachingAssignment)
     private readonly teachingAssignmentRepository: Repository<TeachingAssignment>,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   /**
    * Kiểm tra quyền của giảng viên đối với Course.
@@ -120,6 +121,12 @@ export class QuestionBankService {
     // Validate options
     this.validateOptions(dto.questionType, dto.options);
 
+    // Admin tạo thì mặc định APPROVED, Giảng viên tạo thì PENDING
+    const initialApprovalStatus =
+      role === UserRole.ADMIN
+        ? dto.approvalStatus || QuestionApprovalStatus.APPROVED
+        : QuestionApprovalStatus.PENDING;
+
     // Dùng Transaction để lưu Câu hỏi và Đáp án
     return await this.dataSource.transaction(async (manager) => {
       const newQuestion = manager.create(QuestionBank, {
@@ -129,6 +136,8 @@ export class QuestionBankService {
         content: dto.content,
         difficulty: dto.difficulty,
         status: dto.status,
+        approvalStatus: initialApprovalStatus,
+        rejectionReason: null,
         createdBy: userId,
         updatedBy: userId,
       });
@@ -148,7 +157,10 @@ export class QuestionBankService {
 
       return {
         success: true,
-        message: 'Tạo câu hỏi thành công',
+        message:
+          initialApprovalStatus === QuestionApprovalStatus.PENDING
+            ? 'Tạo câu hỏi thành công. Câu hỏi đang chờ Admin kiểm duyệt.'
+            : 'Tạo câu hỏi thành công',
         data: { ...savedQuestion, options: optionsToSave },
       };
     });
@@ -160,6 +172,7 @@ export class QuestionBankService {
     courseId?: string,
     lessonId?: string,
     type?: string,
+    approvalStatus?: string,
   ) {
     // Nếu là Giảng viên, chỉ được lấy câu hỏi của các khóa mà họ dạy
     let allowedCourseIds: string[] = [];
@@ -183,6 +196,8 @@ export class QuestionBankService {
       .createQueryBuilder('qb')
       .leftJoinAndSelect('qb.options', 'options')
       .leftJoinAndSelect('qb.course', 'course')
+      .leftJoin('qb.creator', 'creator')
+      .addSelect(['creator.id', 'creator.fullName', 'creator.email', 'creator.role'])
       .orderBy('qb.createdAt', 'DESC')
       .addOrderBy('options.orderIndex', 'ASC');
 
@@ -202,6 +217,12 @@ export class QuestionBankService {
       queryBuilder.andWhere('qb.questionType = :type', { type });
     }
 
+    if (approvalStatus) {
+      queryBuilder.andWhere('qb.approvalStatus = :approvalStatus', {
+        approvalStatus,
+      });
+    }
+
     const questions = await queryBuilder.getMany();
     return {
       success: true,
@@ -212,7 +233,7 @@ export class QuestionBankService {
   async findQuestionById(id: string, userId: string, role: string) {
     const question = await this.questionBankRepository.findOne({
       where: { id },
-      relations: { options: true },
+      relations: { options: true, course: true, creator: true },
     });
 
     if (!question) {
@@ -247,6 +268,12 @@ export class QuestionBankService {
       throw new NotFoundException('Không tìm thấy câu hỏi');
     }
 
+    if (question.createdBy && question.createdBy !== userId) {
+      throw new ForbiddenException(
+        'Bạn không có quyền chỉnh sửa câu hỏi do người dùng khác tạo. Bạn chỉ có thể kiểm duyệt hoặc xóa câu hỏi.',
+      );
+    }
+
     if (question.courseId) {
       await this.checkLecturerPermission(userId, role, question.courseId);
     }
@@ -256,12 +283,20 @@ export class QuestionBankService {
       this.validateOptions(newType as QuestionTypeEnum, dto.options);
     }
 
+    // Nếu Giảng viên chỉnh sửa câu hỏi thì Đưa về trạng thái PENDING để Admin duyệt lại
+    const nextApprovalStatus =
+      role === UserRole.LECTURER
+        ? QuestionApprovalStatus.PENDING
+        : dto.approvalStatus || question.approvalStatus;
+
     return await this.dataSource.transaction(async (manager) => {
       Object.assign(question, {
         questionType: newType,
         content: dto.content ?? question.content,
         difficulty: dto.difficulty ?? question.difficulty,
         status: dto.status ?? question.status,
+        approvalStatus: nextApprovalStatus,
+        rejectionReason: role === UserRole.LECTURER ? null : question.rejectionReason,
         updatedBy: userId,
       });
 
@@ -285,10 +320,51 @@ export class QuestionBankService {
 
       return {
         success: true,
-        message: 'Cập nhật câu hỏi thành công',
+        message:
+          nextApprovalStatus === QuestionApprovalStatus.PENDING
+            ? 'Cập nhật câu hỏi thành công. Nội dung đã gửi lại để Admin duyệt.'
+            : 'Cập nhật câu hỏi thành công',
         data: updatedQuestion,
       };
     });
+  }
+
+  async reviewQuestion(id: string, dto: ReviewQuestionDto, adminId: string) {
+    const question = await this.questionBankRepository.findOne({
+      where: { id },
+      relations: { options: true, course: true },
+    });
+
+    if (!question) {
+      throw new NotFoundException('Không tìm thấy câu hỏi cần kiểm duyệt');
+    }
+
+    if (
+      dto.status === QuestionApprovalStatus.REJECTED &&
+      (!dto.rejectionReason || !dto.rejectionReason.trim())
+    ) {
+      throw new BadRequestException('Vui lòng nhập lý do từ chối câu hỏi');
+    }
+
+    question.approvalStatus = dto.status;
+    question.rejectionReason =
+      dto.status === QuestionApprovalStatus.REJECTED
+        ? dto.rejectionReason?.trim() || null
+        : null;
+    question.reviewedBy = adminId;
+    question.reviewedAt = new Date();
+    question.updatedBy = adminId;
+
+    const saved = await this.questionBankRepository.save(question);
+
+    return {
+      success: true,
+      message:
+        dto.status === QuestionApprovalStatus.APPROVED
+          ? 'Đã phê duyệt câu hỏi thành công'
+          : 'Đã từ chối câu hỏi thành công',
+      data: saved,
+    };
   }
 
   async removeQuestion(id: string, userId: string, role: string) {

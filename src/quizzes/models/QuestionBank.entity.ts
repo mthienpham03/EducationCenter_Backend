@@ -11,11 +11,18 @@ import {
 } from 'typeorm';
 import { Course } from '../../courses/models/Course.entity';
 import { Lesson } from '../../curriculum/models/Lesson.entity';
+import { User } from '../../users/models/User.entity';
 import { QuestionOption } from './QuestionOption.entity';
 
 export enum QuestionStatus {
   ACTIVE = 'active',
   INACTIVE = 'inactive',
+}
+
+export enum QuestionApprovalStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
 }
 
 @Entity('question_bank')
@@ -53,8 +60,29 @@ export class QuestionBank {
   })
   status: QuestionStatus;
 
+  @Column({
+    name: 'approval_status',
+    type: 'enum',
+    enum: QuestionApprovalStatus,
+    default: QuestionApprovalStatus.PENDING,
+  })
+  approvalStatus: QuestionApprovalStatus;
+
+  @Column({ name: 'rejection_reason', type: 'text', nullable: true })
+  rejectionReason: string | null;
+
+  @Column({ name: 'reviewed_by', type: 'uuid', nullable: true })
+  reviewedBy: string | null;
+
+  @Column({ name: 'reviewed_at', type: 'timestamptz', nullable: true })
+  reviewedAt: Date | null;
+
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
   createdBy: string | null;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'created_by' })
+  creator: User | null;
 
   @Column({ name: 'updated_by', type: 'uuid', nullable: true })
   updatedBy: string | null;
