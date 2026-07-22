@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { QuestionBank, QuestionApprovalStatus } from '../models/QuestionBank.entity';
+import { QuestionBank, QuestionStatus, QuestionApprovalStatus } from '../models/QuestionBank.entity';
 import { QuestionOption } from '../models/QuestionOption.entity';
 import { Course } from '../../courses/models/Course.entity';
 import { Lesson } from '../../curriculum/models/Lesson.entity';
@@ -276,6 +276,12 @@ export class QuestionBankService {
 
     if (question.courseId) {
       await this.checkLecturerPermission(userId, role, question.courseId);
+    }
+
+    if (role === UserRole.LECTURER && dto.status && dto.status !== QuestionStatus.PENDING) {
+      throw new ForbiddenException(
+        'Giảng viên không có quyền trực tiếp thay đổi trạng thái câu hỏi. Cần Admin kiểm duyệt.',
+      );
     }
 
     const newType = dto.questionType || question.questionType;

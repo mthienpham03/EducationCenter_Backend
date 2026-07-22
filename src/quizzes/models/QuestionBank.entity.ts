@@ -17,6 +17,7 @@ import { QuestionOption } from './QuestionOption.entity';
 export enum QuestionStatus {
   ACTIVE = 'active',
   INACTIVE = 'inactive',
+  PENDING = 'pending',
 }
 
 export enum QuestionApprovalStatus {

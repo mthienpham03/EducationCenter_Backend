@@ -13,7 +13,7 @@ import { Quiz, QuizStatus } from '../models/Quiz.entity';
 import { QuizQuestion } from '../models/QuizQuestion.entity';
 import { QuizAttempt } from '../models/QuizAttempt.entity';
 import { QuizAnswer } from '../models/QuizAnswer.entity';
-import { QuestionBank } from '../models/QuestionBank.entity';
+import { QuestionBank, QuestionStatus, QuestionApprovalStatus } from '../models/QuestionBank.entity';
 import { QuestionOption } from '../models/QuestionOption.entity';
 import { Course } from '../../courses/models/Course.entity';
 import { Lesson } from '../../curriculum/models/Lesson.entity';
@@ -357,6 +357,10 @@ export class QuizzesService {
       throw new NotFoundException('Không tìm thấy câu hỏi trong ngân hàng câu hỏi');
     }
 
+    if (question.approvalStatus && question.approvalStatus !== QuestionApprovalStatus.APPROVED) {
+      throw new BadRequestException('Chỉ có thể thêm câu hỏi đã được kiểm duyệt (Approved) vào bài kiểm tra');
+    }
+
     const existing = await this.quizQuestionRepository.findOne({
       where: { quizId, questionId: dto.questionId },
     });
@@ -409,6 +413,11 @@ export class QuizzesService {
       const question = await this.questionBankRepository.findOne({ where: { id: item.questionId } });
       if (!question) {
         errors.push({ questionId: item.questionId, error: 'Không tìm thấy trong ngân hàng câu hỏi' });
+        continue;
+      }
+
+      if (question.approvalStatus && question.approvalStatus !== QuestionApprovalStatus.APPROVED) {
+        errors.push({ questionId: item.questionId, error: 'Câu hỏi chưa được kiểm duyệt (Approved)' });
         continue;
       }
 
