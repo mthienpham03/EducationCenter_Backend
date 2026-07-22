@@ -496,19 +496,64 @@ export class QuizzesService {
       where: { quizId, studentId, submittedAt: IsNull() },
     });
     if (pendingAttempt) {
-      // Trả về lượt đang làm dở, không tạo mới
-      const questions = await this.buildQuizQuestionsForStudent(quizId, quiz.shuffleQuestions);
-      return {
-        success: true,
-        message: 'Bạn đang có lượt làm dở. Tiếp tục làm bài.',
-        data: {
-          attemptId: pendingAttempt.id,
-          attemptNo: pendingAttempt.attemptNo,
-          startedAt: pendingAttempt.startedAt,
-          durationMinutes: quiz.durationMinutes,
-          questions,
-        },
-      };
+      // Nếu quiz có giới hạn thời gian (durationMinutes), kiểm tra xem lượt làm dở này có bị quá giờ không
+      if (quiz.durationMinutes !== null && quiz.durationMinutes > 0) {
+        const now = new Date();
+        const startedAtMs = new Date(pendingAttempt.startedAt).getTime();
+        const durationMs = quiz.durationMinutes * 60 * 1000;
+        const graceMs = 60 * 1000; // 60s gia hạn mạng
+
+        if (now.getTime() - startedAtMs > durationMs + graceMs) {
+          // Lượt làm dở đã quá thời gian quy định -> Tự động nộp/đóng lượt làm bài này
+          pendingAttempt.submittedAt = new Date(startedAtMs + durationMs);
+          pendingAttempt.totalScore = 0;
+          await this.quizAttemptRepository.save(pendingAttempt);
+
+          // Dọn dẹp Redis
+          await this.redis.del(`quiz:timer:${pendingAttempt.id}`);
+          await this.redis.del(`quiz:active:${quizId}:${studentId}`);
+
+          // Kiểm tra lại tổng số lần làm bài sau khi tự động nộp lượt quá hạn
+          const updatedAttemptCount = await this.quizAttemptRepository.count({
+            where: { quizId, studentId },
+          });
+
+          if (updatedAttemptCount >= quiz.maxAttempts) {
+            throw new BadRequestException(
+              `Lượt làm bài trước đó của bạn đã hết thời gian quy định. Bạn đã sử dụng hết ${quiz.maxAttempts} lần làm bài cho bài kiểm tra này.`,
+            );
+          }
+          // Nếu còn lượt làm bài -> Chạy tiếp xuống dưới để tạo lượt mới!
+        } else {
+          // Vẫn trong thời gian làm bài hợp lệ -> Cho tiếp tục
+          const questions = await this.buildQuizQuestionsForStudent(quizId, quiz.shuffleQuestions);
+          return {
+            success: true,
+            message: 'Bạn đang có lượt làm dở. Tiếp tục làm bài.',
+            data: {
+              attemptId: pendingAttempt.id,
+              attemptNo: pendingAttempt.attemptNo,
+              startedAt: pendingAttempt.startedAt,
+              durationMinutes: quiz.durationMinutes,
+              questions,
+            },
+          };
+        }
+      } else {
+        // Quiz không giới hạn thời gian -> Trả về lượt làm dở
+        const questions = await this.buildQuizQuestionsForStudent(quizId, quiz.shuffleQuestions);
+        return {
+          success: true,
+          message: 'Bạn đang có lượt làm dở. Tiếp tục làm bài.',
+          data: {
+            attemptId: pendingAttempt.id,
+            attemptNo: pendingAttempt.attemptNo,
+            startedAt: pendingAttempt.startedAt,
+            durationMinutes: quiz.durationMinutes,
+            questions,
+          },
+        };
+      }
     }
 
     // 5. Tạo lượt làm mới
@@ -725,14 +770,24 @@ export class QuizzesService {
         quizTitle: quiz.title,
         maxAttempts: quiz.maxAttempts,
         attemptsUsed: attempts.length,
-        attempts: attempts.map((a) => ({
-          attemptId: a.id,
-          attemptNo: a.attemptNo,
-          startedAt: a.startedAt,
-          submittedAt: a.submittedAt,
-          totalScore: a.totalScore,
-          status: a.submittedAt ? 'submitted' : 'in_progress',
-        })),
+        attempts: attempts.map((a) => {
+          let isExpired = false;
+          if (!a.submittedAt && quiz.durationMinutes && quiz.durationMinutes > 0) {
+            const startedAtMs = new Date(a.startedAt).getTime();
+            const durationMs = quiz.durationMinutes * 60 * 1000;
+            if (Date.now() - startedAtMs > durationMs + 60000) {
+              isExpired = true;
+            }
+          }
+          return {
+            attemptId: a.id,
+            attemptNo: a.attemptNo,
+            startedAt: a.startedAt,
+            submittedAt: a.submittedAt,
+            totalScore: a.totalScore,
+            status: a.submittedAt ? 'submitted' : (isExpired ? 'expired' : 'in_progress'),
+          };
+        }),
       },
     };
   }
