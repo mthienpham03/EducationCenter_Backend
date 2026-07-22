@@ -481,17 +481,7 @@ export class QuizzesService {
     // 2. Học viên phải đang ghi danh vào khóa học
     await this.assertStudentEnrolled(studentId, quiz.courseId);
 
-    // 3. Kiểm tra số lần làm đã dùng
-    const attemptCount = await this.quizAttemptRepository.count({
-      where: { quizId, studentId },
-    });
-    if (attemptCount >= quiz.maxAttempts) {
-      throw new BadRequestException(
-        `Bạn đã sử dụng hết ${quiz.maxAttempts} lần làm bài cho quiz này`,
-      );
-    }
-
-    // 4. Kiểm tra có lượt làm chưa nộp không (chưa submit)
+    // 3. Kiểm tra có lượt làm chưa nộp không (chưa submit)
     const pendingAttempt = await this.quizAttemptRepository.findOne({
       where: { quizId, studentId, submittedAt: IsNull() },
     });
@@ -513,19 +503,9 @@ export class QuizzesService {
           await this.redis.del(`quiz:timer:${pendingAttempt.id}`);
           await this.redis.del(`quiz:active:${quizId}:${studentId}`);
 
-          // Kiểm tra lại tổng số lần làm bài sau khi tự động nộp lượt quá hạn
-          const updatedAttemptCount = await this.quizAttemptRepository.count({
-            where: { quizId, studentId },
-          });
-
-          if (updatedAttemptCount >= quiz.maxAttempts) {
-            throw new BadRequestException(
-              `Lượt làm bài trước đó của bạn đã hết thời gian quy định. Bạn đã sử dụng hết ${quiz.maxAttempts} lần làm bài cho bài kiểm tra này.`,
-            );
-          }
-          // Nếu còn lượt làm bài -> Chạy tiếp xuống dưới để tạo lượt mới!
+          // Không return ở đây, để code tiếp tục chạy xuống bước 4 kiểm tra maxAttempts trước khi tạo lượt mới
         } else {
-          // Vẫn trong thời gian làm bài hợp lệ -> Cho tiếp tục
+          // Vẫn trong thời gian làm bài hợp lệ -> Cho tiếp tục lượt đang làm dở
           const questions = await this.buildQuizQuestionsForStudent(quizId, quiz.shuffleQuestions);
           return {
             success: true,
@@ -554,6 +534,16 @@ export class QuizzesService {
           },
         };
       }
+    }
+
+    // 4. Nếu không có lượt làm dở hợp lệ -> Kiểm tra số lần làm đã dùng trước khi tạo lượt mới
+    const attemptCount = await this.quizAttemptRepository.count({
+      where: { quizId, studentId },
+    });
+    if (quiz.maxAttempts && attemptCount >= quiz.maxAttempts) {
+      throw new BadRequestException(
+        `Bạn đã sử dụng hết ${quiz.maxAttempts} lần làm bài cho bài kiểm tra này.`,
+      );
     }
 
     // 5. Tạo lượt làm mới
