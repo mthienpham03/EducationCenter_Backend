@@ -18,6 +18,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { CurriculumModule } from './curriculum/modules/curriculum.module';
 import { DocumentsModule } from './documents/modules/documents.module';
 import { QuizzesModule } from './quizzes/modules/quizzes.module';
+import { SchedulesModule } from './schedules/modules/schedules.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { QuizzesModule } from './quizzes/modules/quizzes.module';
     CurriculumModule,
     DocumentsModule,
     QuizzesModule,
+    SchedulesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
