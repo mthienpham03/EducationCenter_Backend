@@ -69,6 +69,12 @@ export class Schedule {
   })
   status: ScheduleStatus;
 
+  @Column({ type: 'text', nullable: true })
+  reason: string | null;
+
+  @Column({ name: 'is_emergency', type: 'boolean', default: false })
+  isEmergency: boolean;
+
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
   createdBy: string | null;
 

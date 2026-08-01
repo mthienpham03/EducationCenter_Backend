@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsUUID,
   IsDateString,
+  IsBoolean,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -103,4 +104,15 @@ export class UpdateScheduleDto {
   @IsOptional()
   @IsEnum(ScheduleStatus, { message: 'Trạng thái lịch học không hợp lệ' })
   status?: ScheduleStatus;
+
+  @ApiPropertyOptional({ description: 'Lý do (nếu hủy/dời)', example: 'Giảng viên có việc đột xuất' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+
+  @ApiPropertyOptional({ description: 'Đánh dấu đây là cảnh báo khẩn cấp', example: true })
+  @IsOptional()
+  @IsBoolean()
+  isEmergency?: boolean;
 }

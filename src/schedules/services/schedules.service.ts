@@ -10,6 +10,7 @@ import { User, UserRole, UserStatus } from '../../users/models/User.entity';
 import { Course } from '../../courses/models/Course.entity';
 import { Class } from '../../courses/models/Class.entity';
 import { Lesson, LessonStatus } from '../../curriculum/models/Lesson.entity';
+import { Notification, NotificationStatus } from '../../notifications/models/Notification.entity';
 import { CreateScheduleDto, UpdateScheduleDto } from '../dto/schedule.dto';
 import { AutoGenerateScheduleDto } from '../dto/auto-generate-schedule.dto';
 
@@ -26,6 +27,8 @@ export class SchedulesService {
     private readonly classRepository: Repository<Class>,
     @InjectRepository(Lesson)
     private readonly lessonRepository: Repository<Lesson>,
+    @InjectRepository(Notification)
+    private readonly notificationRepository: Repository<Notification>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -324,6 +327,47 @@ export class SchedulesService {
 
     const updated = await this.scheduleRepository.save(schedule);
 
+    // Xử lý Hủy / Dời lịch / Khẩn cấp
+    const isCancelledOrRescheduled =
+      dto.status === ScheduleStatus.CANCELLED ||
+      dto.status === ScheduleStatus.RESCHEDULED;
+
+    if (isCancelledOrRescheduled || dto.isEmergency) {
+      const isCancel = dto.status === ScheduleStatus.CANCELLED;
+      const titlePrefix = dto.isEmergency ? '[KHẨN CẤP] ' : '';
+      const actionTitle = isCancel ? 'Hủy lịch học' : 'Dời lịch học';
+      
+      const title = `${titlePrefix}Thông báo ${actionTitle}`;
+      const reasonText = dto.reason ? ` Lý do: ${dto.reason}` : '';
+      const content = `Lịch học lúc ${schedule.startTime.toISOString()} đã bị ${isCancel ? 'hủy' : 'dời'}.${reasonText}`;
+
+      // Gửi cho Giảng viên (Lecturer)
+      if (schedule.lecturerId) {
+        await this.notificationRepository.save(
+          this.notificationRepository.create({
+            title,
+            content,
+            targetType: 'user',
+            targetId: schedule.lecturerId,
+            status: NotificationStatus.UNREAD,
+          }),
+        );
+      }
+
+      // Gửi cho cả Lớp (Class)
+      if (schedule.classId) {
+        await this.notificationRepository.save(
+          this.notificationRepository.create({
+            title,
+            content,
+            targetType: 'class',
+            targetId: schedule.classId,
+            status: NotificationStatus.UNREAD,
+          }),
+        );
+      }
+    }
+
     return {
       success: true,
       message: 'Cập nhật lịch dạy thành công',
@@ -335,6 +379,37 @@ export class SchedulesService {
     const schedule = await this.scheduleRepository.findOne({ where: { id } });
     if (!schedule) {
       throw new NotFoundException('Không tìm thấy lịch dạy');
+    }
+
+    // Đổi status thành CANCELLED trước khi softRemove
+    schedule.status = ScheduleStatus.CANCELLED;
+    schedule.reason = 'Hủy lịch học từ Admin';
+    schedule.isEmergency = true;
+    await this.scheduleRepository.save(schedule);
+
+    // Gửi thông báo khẩn cấp cho giảng viên và lớp
+    const title = '[KHẨN CẤP] Hủy lịch học';
+    const content = `Lịch học lúc ${schedule.startTime.toISOString()} đã bị hủy bởi Quản trị viên.`;
+
+    if (schedule.lecturerId) {
+      await this.notificationRepository.save(
+        this.notificationRepository.create({
+          title,
+          content,
+          targetType: 'user',
+          targetId: schedule.lecturerId,
+        }),
+      );
+    }
+    if (schedule.classId) {
+      await this.notificationRepository.save(
+        this.notificationRepository.create({
+          title,
+          content,
+          targetType: 'class',
+          targetId: schedule.classId,
+        }),
+      );
     }
 
     await this.scheduleRepository.softRemove(schedule);
