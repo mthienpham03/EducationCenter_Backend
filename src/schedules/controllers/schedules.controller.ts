@@ -19,6 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { SchedulesService } from '../services/schedules.service';
 import { CreateScheduleDto, UpdateScheduleDto } from '../dto/schedule.dto';
+import { AutoGenerateScheduleDto } from '../dto/auto-generate-schedule.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -38,6 +39,15 @@ export class SchedulesController {
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ hoặc giảng viên bị trùng lịch.' })
   async createSchedule(@Body() dto: CreateScheduleDto, @Req() req: any) {
     return this.schedulesService.createSchedule(dto, req.user.id);
+  }
+
+  @Post('auto-generate')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Tự động tạo lịch học theo danh sách bài học của khóa' })
+  @ApiResponse({ status: 201, description: 'Tạo lịch học hàng loạt thành công.' })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ hoặc bị trùng lịch.' })
+  async autoGenerateSchedules(@Body() dto: AutoGenerateScheduleDto, @Req() req: any) {
+    return this.schedulesService.autoGenerateSchedules(dto, req.user.id);
   }
 
   @Get()

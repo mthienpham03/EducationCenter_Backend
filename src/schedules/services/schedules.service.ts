@@ -4,12 +4,14 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Schedule, ScheduleStatus } from '../models/Schedule.entity';
 import { User, UserRole, UserStatus } from '../../users/models/User.entity';
 import { Course } from '../../courses/models/Course.entity';
 import { Class } from '../../courses/models/Class.entity';
+import { Lesson, LessonStatus } from '../../curriculum/models/Lesson.entity';
 import { CreateScheduleDto, UpdateScheduleDto } from '../dto/schedule.dto';
+import { AutoGenerateScheduleDto } from '../dto/auto-generate-schedule.dto';
 
 @Injectable()
 export class SchedulesService {
@@ -22,6 +24,9 @@ export class SchedulesService {
     private readonly courseRepository: Repository<Course>,
     @InjectRepository(Class)
     private readonly classRepository: Repository<Class>,
+    @InjectRepository(Lesson)
+    private readonly lessonRepository: Repository<Lesson>,
+    private readonly dataSource: DataSource,
   ) {}
 
   private async validateScheduleOverlap(
@@ -100,6 +105,126 @@ export class SchedulesService {
       success: true,
       message: 'Tạo lịch dạy thành công',
       data: saved,
+    };
+  }
+
+  async autoGenerateSchedules(dto: AutoGenerateScheduleDto, creatorId?: string) {
+    // 1. Validate inputs
+    const lecturer = await this.userRepository.findOne({
+      where: { id: dto.lecturerId, role: UserRole.LECTURER },
+    });
+    if (!lecturer || lecturer.status === UserStatus.LOCKED) {
+      throw new BadRequestException('Giảng viên không tồn tại hoặc bị khóa');
+    }
+
+    const course = await this.courseRepository.findOne({ where: { id: dto.courseId } });
+    if (!course) {
+      throw new NotFoundException('Khóa học không tồn tại');
+    }
+
+    const classEntity = await this.classRepository.findOne({ where: { id: dto.classId } });
+    if (!classEntity) {
+      throw new NotFoundException('Lớp học không tồn tại');
+    }
+
+    // 2. Fetch and sort lessons
+    const lessons = await this.lessonRepository.find({
+      where: { chapter: { courseId: dto.courseId } },
+      relations: { chapter: true },
+      order: {
+        chapter: { orderIndex: 'ASC' },
+        orderIndex: 'ASC',
+      },
+    });
+
+    if (!lessons.length) {
+      throw new BadRequestException('Khóa học chưa có bài học nào để tạo lịch');
+    }
+
+    // 3. Algorithm: Match dates
+    const schedulesToCreate: Schedule[] = [];
+    let currentDate = new Date(dto.startDate);
+    
+    // Sort pattern days just in case
+    const pattern = dto.schedulePattern;
+    if (!pattern || pattern.length === 0) {
+      throw new BadRequestException('Mẫu lịch học (schedulePattern) không được để trống');
+    }
+
+    for (const lesson of lessons) {
+      // Find the next matching day
+      let matchFound = false;
+      let iterations = 0; // Guard to prevent infinite loop
+
+      while (!matchFound && iterations < 365) { // Max 1 year forward
+        const currentDayOfWeek = currentDate.getDay();
+        
+        const matchedPattern = pattern.find(p => p.dayOfWeek === currentDayOfWeek);
+        if (matchedPattern) {
+          // Construct start and end dates
+          const [startHour, startMinute] = matchedPattern.startTime.split(':').map(Number);
+          const [endHour, endMinute] = matchedPattern.endTime.split(':').map(Number);
+          
+          const startTime = new Date(currentDate);
+          startTime.setHours(startHour, startMinute, 0, 0);
+
+          const endTime = new Date(currentDate);
+          endTime.setHours(endHour, endMinute, 0, 0);
+
+          if (startTime >= endTime) {
+            throw new BadRequestException(`Giờ học ${matchedPattern.startTime} - ${matchedPattern.endTime} không hợp lệ`);
+          }
+
+          // Validate Overlap for this specific generated schedule
+          await this.validateScheduleOverlap(dto.lecturerId, startTime, endTime);
+
+          const newSchedule = this.scheduleRepository.create({
+            courseId: dto.courseId,
+            classId: dto.classId,
+            lecturerId: dto.lecturerId,
+            lessonId: lesson.id,
+            startTime,
+            endTime,
+            room: matchedPattern.room || null,
+            status: ScheduleStatus.SCHEDULED,
+            createdBy: creatorId,
+            updatedBy: creatorId,
+          });
+
+          schedulesToCreate.push(newSchedule);
+          matchFound = true;
+        }
+
+        // Always advance the date after processing (or if not matched)
+        currentDate.setDate(currentDate.getDate() + 1);
+        iterations++;
+      }
+      
+      if (!matchFound) {
+        throw new BadRequestException('Không thể xếp lịch do thuật toán vượt quá 365 ngày');
+      }
+    }
+
+    // 4. Save using transaction
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    let savedSchedules: Schedule[] = [];
+    try {
+      savedSchedules = await queryRunner.manager.save(Schedule, schedulesToCreate);
+      await queryRunner.commitTransaction();
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+
+    return {
+      success: true,
+      message: `Đã tự động tạo thành công ${savedSchedules.length} buổi học.`,
+      data: savedSchedules,
     };
   }
 
