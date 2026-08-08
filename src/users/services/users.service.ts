@@ -898,6 +898,208 @@ export class UsersService {
     return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
   }
 
+  async importLecturers(file: Express.Multer.File) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('Vui lòng tải lên file Excel hợp lệ');
+    }
+
+    let workbook;
+    try {
+      workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    } catch (e) {
+      throw new BadRequestException(
+        'Không thể đọc file Excel. Vui lòng kiểm tra lại định dạng file.',
+      );
+    }
+
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+
+    if (rows.length <= 1) {
+      throw new BadRequestException(
+        'File Excel không có dữ liệu hoặc thiếu tiêu đề',
+      );
+    }
+
+    const headers = rows[0].map((h) =>
+      String(h || '')
+        .trim()
+        .toLowerCase(),
+    );
+    const emailIdx = headers.findIndex((h) => h.includes('email'));
+    const nameIdx = headers.findIndex(
+      (h) => h.includes('tên') || h.includes('name') || h.includes('họ'),
+    );
+    const phoneIdx = headers.findIndex(
+      (h) =>
+        h.includes('điện thoại') || h.includes('phone') || h.includes('sđt'),
+    );
+    const experienceIdx = headers.findIndex(
+      (h) => h.includes('kinh nghiệm') || h.includes('experience'),
+    );
+    const degreeIdx = headers.findIndex(
+      (h) => h.includes('bằng cấp') || h.includes('degree'),
+    );
+
+    if (emailIdx === -1 || nameIdx === -1) {
+      throw new BadRequestException(
+        'File Excel phải chứa các cột bắt buộc: Email, Họ và Tên',
+      );
+    }
+
+    const results = {
+      successCount: 0,
+      errorCount: 0,
+      details: [] as {
+        row: number;
+        email?: string;
+        success: boolean;
+        message: string;
+      }[],
+    };
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      // Skip completely empty rows
+      if (
+        !row ||
+        row.length === 0 ||
+        row.every((val) => val === undefined || val === null || val === '')
+      ) {
+        continue;
+      }
+
+      const email = String(row[emailIdx] || '').trim();
+      const fullName = String(row[nameIdx] || '').trim();
+      const phone =
+        phoneIdx !== -1 && row[phoneIdx] !== undefined && row[phoneIdx] !== null
+          ? String(row[phoneIdx]).trim()
+          : null;
+      const experienceYears =
+        experienceIdx !== -1 && row[experienceIdx] !== undefined
+          ? parseInt(row[experienceIdx], 10)
+          : 0;
+      const degree =
+        degreeIdx !== -1 && row[degreeIdx] !== undefined
+          ? String(row[degreeIdx]).trim()
+          : null;
+
+      if (!email || !fullName) {
+        results.errorCount++;
+        results.details.push({
+          row: i + 1,
+          email: email || undefined,
+          success: false,
+          message: 'Thiếu thông tin bắt buộc (Email hoặc Họ và Tên)',
+        });
+        continue;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        results.errorCount++;
+        results.details.push({
+          row: i + 1,
+          email,
+          success: false,
+          message: 'Email không đúng định dạng',
+        });
+        continue;
+      }
+
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      try {
+        const userRepository = queryRunner.manager.getRepository(User);
+        const lecturerProfileRepository =
+          queryRunner.manager.getRepository(LecturerProfile);
+
+        // Check unique email
+        const existingUser = await userRepository.findOne({ where: { email } });
+        if (existingUser) {
+          throw new BadRequestException('Email đã tồn tại trong hệ thống');
+        }
+
+        // Generate random password
+        const plainPassword = this.generateRandomPassword();
+        const passwordHash = await bcrypt.hash(plainPassword, 10);
+
+        // Create user
+        const user = userRepository.create({
+          email,
+          passwordHash,
+          fullName,
+          phone,
+          role: UserRole.LECTURER,
+          status: UserStatus.ACTIVE,
+        });
+        const savedUser = await userRepository.save(user);
+
+        // Create lecturer profile
+        const profile = lecturerProfileRepository.create({
+          userId: savedUser.id,
+          experienceYears: isNaN(experienceYears) ? 0 : experienceYears,
+          degree,
+        });
+        await lecturerProfileRepository.save(profile);
+
+        await queryRunner.commitTransaction();
+
+        // Send email in background
+        this.mailService
+          .sendAccountCreatedEmail(
+            email,
+            fullName,
+            plainPassword,
+            UserRole.LECTURER,
+          )
+          .catch((e) => console.error(`Error sending mail to ${email}:`, e));
+
+        results.successCount++;
+        results.details.push({
+          row: i + 1,
+          email,
+          success: true,
+          message: 'Tạo giảng viên thành công',
+        });
+      } catch (err: any) {
+        await queryRunner.rollbackTransaction();
+        results.errorCount++;
+        results.details.push({
+          row: i + 1,
+          email,
+          success: false,
+          message: err.message || 'Có lỗi khi tạo tài khoản',
+        });
+      } finally {
+        await queryRunner.release();
+      }
+    }
+
+    return {
+      success: true,
+      message: `Import hoàn tất. Thành công: ${results.successCount}, Thất bại: ${results.errorCount}`,
+      data: results,
+    };
+  }
+
+  async getLecturerImportTemplate() {
+    const headers = [
+      ['Email', 'Họ và tên', 'Số điện thoại', 'Số năm kinh nghiệm', 'Bằng cấp'],
+      ['giangvien1@gmail.com', 'TS. Nguyễn Văn A', '0912345678', '5', 'Tiến sĩ'],
+      ['giangvien2@gmail.com', 'ThS. Trần Văn B', '0987654321', '3', 'Thạc sĩ'],
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(headers);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Template Import');
+
+    return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  }
+
   async getProfile(userId: string, role: UserRole) {
     const userRepository = this.dataSource.getRepository(User);
     const relations =

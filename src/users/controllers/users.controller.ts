@@ -253,6 +253,49 @@ export class UsersController {
     res.end(buffer);
   }
 
+  @Post('import-lecturers')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Admin import danh sách giảng viên từ file Excel' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'File Excel (.xlsx, .xls) chứa danh sách giảng viên',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Import hoàn tất và trả về báo cáo kết quả chi tiết',
+  })
+  async importLecturers(@UploadedFile() file: Express.Multer.File) {
+    return this.usersService.importLecturers(file);
+  }
+
+  @Get('import-lecturers/template')
+  @ApiOperation({ summary: 'Tải file Excel mẫu để import giảng viên' })
+  @ApiResponse({
+    status: 200,
+    description: 'Tải file Excel mẫu thành công',
+  })
+  async getLecturerImportTemplate(@Res() res: express.Response) {
+    const buffer = await this.usersService.getLecturerImportTemplate();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=template-import-lecturers.xlsx',
+    );
+    res.end(buffer);
+  }
+
   @Post('upload-avatar')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
